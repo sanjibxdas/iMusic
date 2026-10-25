@@ -180,8 +180,8 @@ final class IconFactory {
 
             // Left curve
             path.addCurve(to: CGPoint(x: s * 0.15, y: s * 0.42),
-                          control1: CGPoint(x: s * 0.28, y: s * 0.68),
-                          control2: CGPoint(x: s * 0.15, y: s * 0.55))
+                          controlPoint1: CGPoint(x: s * 0.28, y: s * 0.68),
+                          controlPoint2: CGPoint(x: s * 0.15, y: s * 0.55))
             path.addArc(withCenter: CGPoint(x: s * 0.32, y: s * 0.32),
                         radius: s * 0.18,
                         startAngle: .pi,
@@ -195,8 +195,8 @@ final class IconFactory {
                         endAngle: 0,
                         clockwise: true)
             path.addCurve(to: CGPoint(x: s * 0.5, y: s * 0.82),
-                          control1: CGPoint(x: s * 0.85, y: s * 0.55),
-                          control2: CGPoint(x: s * 0.72, y: s * 0.68))
+                          controlPoint1: CGPoint(x: s * 0.85, y: s * 0.55),
+                          controlPoint2: CGPoint(x: s * 0.72, y: s * 0.68))
             path.close()
 
             if filled {

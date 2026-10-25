@@ -172,7 +172,7 @@ final class LyricsViewController: UIViewController, UITableViewDataSource, UITab
         isUserScrolling = true
     }
 
-    func scrollViewDidEndDragging(_ scrollView: UIScrollView, decelerate: Bool) {
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if !decelerate { isUserScrolling = false }
     }
 
