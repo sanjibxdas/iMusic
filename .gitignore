@@ -1,0 +1,12 @@
+.DS_Store
+build/
+DerivedData/
+*.xcworkspace
+!default.xcworkspace
+xcuserdata/
+*.ipa
+*.deb
+Payload/
+deb_package/
+deb_root/
+deb_control/
