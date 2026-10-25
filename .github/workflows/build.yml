@@ -76,10 +76,10 @@ jobs:
           mv deb_control/control.clean deb_control/control
 
           # Create control.tar.gz
-          tar --numeric-owner --owner=0 --group=0 -czvf deb_root/control.tar.gz -C deb_control control
+          tar -czf deb_root/control.tar.gz -C deb_control control
 
           # Create data.tar.gz with strict directory hierarchy
-          tar --numeric-owner --owner=0 --group=0 -czvf deb_root/data.tar.gz -C deb_package Applications
+          tar -czf deb_root/data.tar.gz -C deb_package Applications
 
           # Pack standard Debian archive
           ar -cr iMusic.deb deb_root/debian-binary deb_root/control.tar.gz deb_root/data.tar.gz
