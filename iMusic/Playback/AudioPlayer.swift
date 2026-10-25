@@ -248,16 +248,16 @@ final class AudioPlayer: NSObject {
         }
 
         // Resolve stream URL dynamically
-        StreamResolver.shared.resolveStreamURL(for: track.id) { [weak self] result in
+        StreamResolver.shared.resolveStreamURL(for: track) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self, self.currentTrack?.id == track.id else { return }
                 switch result {
                 case .success(let streamURL):
                     self.startPlayback(url: streamURL)
                 case .failure(let error):
-                    print("Stream resolve failed: \(error)")
-                    // Try auto-advancing to next track if failed
-                    self.next()
+                    print("Stream resolve failed for \(track.title): \(error)")
+                    self.isPlaying = false
+                    NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
                 }
             }
         }

@@ -35,7 +35,7 @@ final class MusicAPIService {
             case .success(let tracks) where !tracks.isEmpty:
                 completion(.success(tracks))
             case .success, .failure:
-                // Fallback to iTunes Search API for tracks + high-res artwork
+                // Fallback to iTunes Search API
                 self?.searchITunes(query: trimmed, completion: completion)
             }
         }
@@ -93,6 +93,7 @@ final class MusicAPIService {
 
     private func parseInnertubeSearchResults(json: [String: Any]) -> [Track] {
         var tracks: [Track] = []
+        var seenIds = Set<String>()
 
         guard let contents = json["contents"] as? [String: Any],
               let tabbed = contents["tabbedSearchResultsRenderer"] as? [String: Any],
@@ -106,96 +107,139 @@ final class MusicAPIService {
         }
 
         for section in sectionContents {
-            // Check musicCardShelfRenderer (Top result)
+            // 1. Top Card: musicCardShelfRenderer (Exact Match top result)
             if let card = section["musicCardShelfRenderer"] as? [String: Any] {
+                var videoId = ""
+                if let onTab = card["onTap"] as? [String: Any],
+                   let watchEndpoint = onTab["watchEndpoint"] as? [String: Any],
+                   let id = watchEndpoint["videoId"] as? String {
+                    videoId = id
+                }
+
+                var title = ""
                 if let titleRuns = (card["title"] as? [String: Any])?["runs"] as? [[String: Any]],
-                   let title = titleRuns.first?["text"] as? String {
-                    var artist = "Unknown Artist"
-                    if let subtitleRuns = (card["subtitle"] as? [String: Any])?["runs"] as? [[String: Any]] {
-                        let names = subtitleRuns.compactMap { $0["text"] as? String }.filter { $0 != " • " }
-                        if let first = names.first { artist = first }
-                    }
+                   let t = titleRuns.first?["text"] as? String {
+                    title = t
+                }
 
-                    var videoId = ""
-                    if let onTab = card["onTap"] as? [String: Any],
-                       let watchEndpoint = onTab["watchEndpoint"] as? [String: Any],
-                       let id = watchEndpoint["videoId"] as? String {
-                        videoId = id
+                var artist = "Unknown Artist"
+                if let subtitleRuns = (card["subtitle"] as? [String: Any])?["runs"] as? [[String: Any]] {
+                    let filtered = subtitleRuns.compactMap { $0["text"] as? String }.filter {
+                        $0 != " • " && !$0.contains("views") && !$0.contains("Video") && !$0.contains(":")
                     }
+                    if let first = filtered.first { artist = first }
+                }
 
-                    var artworkUrl = ""
-                    if let thumbs = (card["thumbnail"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any],
-                       let thumbObj = (thumbs["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]],
-                       let lastThumb = thumbObj.last,
-                       let url = lastThumb["url"] as? String {
-                        artworkUrl = url
-                    }
+                var artworkUrl = ""
+                if let thumbRenderer = (card["thumbnail"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any],
+                   let thumbObj = (thumbRenderer["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]],
+                   let lastThumb = thumbObj.last,
+                   let url = lastThumb["url"] as? String {
+                    artworkUrl = url
+                }
 
-                    if !videoId.isEmpty {
-                        tracks.append(Track(id: videoId, title: title, artist: artist, artworkUrl: artworkUrl))
+                if !videoId.isEmpty && !title.isEmpty && !seenIds.contains(videoId) {
+                    seenIds.insert(videoId)
+                    tracks.append(Track(id: videoId, title: title, artist: artist, artworkUrl: artworkUrl))
+                }
+            }
+
+            // 2. Sections: itemSectionRenderer (Primary list in modern Innertube)
+            if let itemSec = section["itemSectionRenderer"] as? [String: Any],
+               let subContents = itemSec["contents"] as? [[String: Any]] {
+                for item in subContents {
+                    if let track = parseResponsiveListItem(item) {
+                        if !seenIds.contains(track.id) {
+                            seenIds.insert(track.id)
+                            tracks.append(track)
+                        }
                     }
                 }
             }
 
-            // Check musicShelfRenderer (List of tracks)
+            // 3. Sections: musicShelfRenderer (Classic list fallback)
             if let shelf = section["musicShelfRenderer"] as? [String: Any],
                let shelfContents = shelf["contents"] as? [[String: Any]] {
                 for item in shelfContents {
-                    guard let listItem = item["musicResponsiveListItemRenderer"] as? [String: Any] else { continue }
-
-                    var videoId = ""
-                    if let playlistItemData = listItem["playlistItemData"] as? [String: Any],
-                       let id = playlistItemData["videoId"] as? String {
-                        videoId = id
-                    }
-
-                    guard let flexColumns = listItem["flexColumns"] as? [[String: Any]], !flexColumns.isEmpty else { continue }
-
-                    // Column 0: Title
-                    var title = ""
-                    if let col0 = flexColumns[0]["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any],
-                       let textObj = col0["text"] as? [String: Any],
-                       let runs = textObj["runs"] as? [[String: Any]],
-                       let firstRun = runs.first?["text"] as? String {
-                        title = firstRun
-                    }
-
-                    // Column 1: Artist, Album, Duration
-                    var artist = "Unknown Artist"
-                    var album = ""
-                    var durationSec: TimeInterval = 0
-                    if flexColumns.count > 1,
-                       let col1 = flexColumns[1]["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any],
-                       let textObj = col1["text"] as? [String: Any],
-                       let runs = textObj["runs"] as? [[String: Any]] {
-                        let textRuns = runs.compactMap { $0["text"] as? String }.filter { $0 != " • " }
-                        if let firstArtist = textRuns.first { artist = firstArtist }
-                        if textRuns.count > 1 { album = textRuns[1] }
-                        if let lastRun = textRuns.last, lastRun.contains(":") {
-                            let parts = lastRun.components(separatedBy: ":")
-                            if parts.count == 2, let m = Double(parts[0]), let s = Double(parts[1]) {
-                                durationSec = (m * 60) + s
-                            }
+                    if let track = parseResponsiveListItem(item) {
+                        if !seenIds.contains(track.id) {
+                            seenIds.insert(track.id)
+                            tracks.append(track)
                         }
-                    }
-
-                    // Thumbnail
-                    var artworkUrl = ""
-                    if let thumbRenderer = (listItem["thumbnail"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any],
-                       let thumbs = (thumbRenderer["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]],
-                       let best = thumbs.last,
-                       let u = best["url"] as? String {
-                        artworkUrl = u
-                    }
-
-                    if !videoId.isEmpty && !title.isEmpty {
-                        tracks.append(Track(id: videoId, title: title, artist: artist, album: album, duration: durationSec, artworkUrl: artworkUrl))
                     }
                 }
             }
         }
 
         return tracks
+    }
+
+    private func parseResponsiveListItem(_ item: [String: Any]) -> Track? {
+        guard let listItem = item["musicResponsiveListItemRenderer"] as? [String: Any] else { return nil }
+
+        // Video ID
+        var videoId = ""
+        if let playlistItemData = listItem["playlistItemData"] as? [String: Any],
+           let id = playlistItemData["videoId"] as? String, !id.isEmpty {
+            videoId = id
+        }
+        if videoId.isEmpty {
+            if let overlay = listItem["overlay"] as? [String: Any],
+               let content = (overlay["musicItemThumbnailOverlayRenderer"] as? [String: Any])?["content"] as? [String: Any],
+               let playBtn = content["musicPlayButtonRenderer"] as? [String: Any],
+               let nav = playBtn["playNavigationEndpoint"] as? [String: Any],
+               let watch = nav["watchEndpoint"] as? [String: Any],
+               let id = watch["videoId"] as? String {
+                videoId = id
+            }
+        }
+
+        guard !videoId.isEmpty else { return nil }
+        guard let flexColumns = listItem["flexColumns"] as? [[String: Any]], !flexColumns.isEmpty else { return nil }
+
+        // Column 0: Track Title
+        var title = ""
+        if let col0 = flexColumns[0]["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any],
+           let textObj = col0["text"] as? [String: Any],
+           let runs = textObj["runs"] as? [[String: Any]],
+           let firstRun = runs.first?["text"] as? String {
+            title = firstRun
+        }
+
+        guard !title.isEmpty else { return nil }
+
+        // Column 1: Artist, Album, Duration
+        var artist = "Unknown Artist"
+        var album = ""
+        var durationSec: TimeInterval = 0
+
+        if flexColumns.count > 1,
+           let col1 = flexColumns[1]["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any],
+           let textObj = col1["text"] as? [String: Any],
+           let runs = textObj["runs"] as? [[String: Any]] {
+            let textRuns = runs.compactMap { $0["text"] as? String }.filter {
+                $0 != " • " && $0 != "Song" && $0 != "Video" && !$0.contains("views")
+            }
+            if let first = textRuns.first { artist = first }
+            if textRuns.count > 1 { album = textRuns[1] }
+            if let last = textRuns.last, last.contains(":") {
+                let parts = last.components(separatedBy: ":")
+                if parts.count == 2, let m = Double(parts[0]), let s = Double(parts[1]) {
+                    durationSec = (m * 60) + s
+                }
+            }
+        }
+
+        // Thumbnail
+        var artworkUrl = ""
+        if let thumbRenderer = (listItem["thumbnail"] as? [String: Any])?["musicThumbnailRenderer"] as? [String: Any],
+           let thumbs = (thumbRenderer["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]],
+           let best = thumbs.last,
+           let u = best["url"] as? String {
+            artworkUrl = u
+        }
+
+        return Track(id: videoId, title: title, artist: artist, album: album, duration: durationSec, artworkUrl: artworkUrl)
     }
 
     // MARK: - iTunes Fallback Search
@@ -226,10 +270,7 @@ final class MusicAPIService {
                 let album = (item["collectionName"] as? String) ?? ""
                 let millis = (item["trackTimeMillis"] as? Double) ?? 0
                 let artwork100 = (item["artworkUrl100"] as? String) ?? ""
-                // Upgrade artwork to 600x600 for sharp retina display
                 let highResArtwork = artwork100.replacingOccurrences(of: "100x100bb", with: "600x600bb")
-
-                // Track ID placeholder (will resolve through search when tapped)
                 let id = "itunes_\((item["trackId"] as? Int) ?? 0)"
                 tracks.append(Track(id: id, title: title, artist: artist, album: album, duration: millis / 1000.0, artworkUrl: highResArtwork))
             }
@@ -241,7 +282,6 @@ final class MusicAPIService {
     // MARK: - Featured & Editorial Content
 
     func fetchFeaturedPlaylists(completion: @escaping ([Playlist]) -> Void) {
-        // High quality curated featured playlists for the Browse and For You screens
         let playlists = [
             Playlist(id: "RDCLAK5uy_kmPRjFGN7YstCHdnuf39_7t54v_mJ9Gw",
                      title: "Today's Hits",
@@ -268,7 +308,6 @@ final class MusicAPIService {
     }
 
     func fetchTopCharts(completion: @escaping ([Track]) -> Void) {
-        // Fetch top global songs via YouTube search for top hits
         search(query: "Top Global Hits 2026") { result in
             switch result {
             case .success(let tracks):

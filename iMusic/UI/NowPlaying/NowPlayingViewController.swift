@@ -163,14 +163,15 @@ final class NowPlayingViewController: UIViewController {
 
         NSLayoutConstraint.activate([
             centerContainer.topAnchor.constraint(equalTo: dismissButton.bottomAnchor, constant: 4),
-            centerContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            centerContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            centerContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            centerContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            centerContainer.heightAnchor.constraint(equalToConstant: 240),
 
             // Large Artwork Shadow & View
-            shadowView.topAnchor.constraint(equalTo: centerContainer.topAnchor, constant: 12),
             shadowView.centerXAnchor.constraint(equalTo: centerContainer.centerXAnchor),
-            shadowView.widthAnchor.constraint(equalTo: centerContainer.widthAnchor, multiplier: 0.88),
-            shadowView.heightAnchor.constraint(equalTo: shadowView.widthAnchor),
+            shadowView.centerYAnchor.constraint(equalTo: centerContainer.centerYAnchor),
+            shadowView.widthAnchor.constraint(equalToConstant: 220),
+            shadowView.heightAnchor.constraint(equalToConstant: 220),
 
             artworkView.topAnchor.constraint(equalTo: shadowView.topAnchor),
             artworkView.bottomAnchor.constraint(equalTo: shadowView.bottomAnchor),
@@ -181,29 +182,29 @@ final class NowPlayingViewController: UIViewController {
             compactHeader.topAnchor.constraint(equalTo: centerContainer.topAnchor),
             compactHeader.leadingAnchor.constraint(equalTo: centerContainer.leadingAnchor),
             compactHeader.trailingAnchor.constraint(equalTo: centerContainer.trailingAnchor),
-            compactHeader.heightAnchor.constraint(equalToConstant: 44),
+            compactHeader.heightAnchor.constraint(equalToConstant: 40),
 
             compactArtworkView.leadingAnchor.constraint(equalTo: compactHeader.leadingAnchor),
             compactArtworkView.centerYAnchor.constraint(equalTo: compactHeader.centerYAnchor),
-            compactArtworkView.widthAnchor.constraint(equalToConstant: 40),
-            compactArtworkView.heightAnchor.constraint(equalToConstant: 40),
+            compactArtworkView.widthAnchor.constraint(equalToConstant: 36),
+            compactArtworkView.heightAnchor.constraint(equalToConstant: 36),
 
-            compactTitleLabel.topAnchor.constraint(equalTo: compactArtworkView.topAnchor, constant: 2),
+            compactTitleLabel.topAnchor.constraint(equalTo: compactArtworkView.topAnchor, constant: 1),
             compactTitleLabel.leadingAnchor.constraint(equalTo: compactArtworkView.trailingAnchor, constant: 10),
             compactTitleLabel.trailingAnchor.constraint(equalTo: compactHeader.trailingAnchor),
 
-            compactArtistLabel.bottomAnchor.constraint(equalTo: compactArtworkView.bottomAnchor, constant: -2),
+            compactArtistLabel.bottomAnchor.constraint(equalTo: compactArtworkView.bottomAnchor, constant: -1),
             compactArtistLabel.leadingAnchor.constraint(equalTo: compactTitleLabel.leadingAnchor),
             compactArtistLabel.trailingAnchor.constraint(equalTo: compactHeader.trailingAnchor),
 
             // Lyrics child
-            lyricsVC.view.topAnchor.constraint(equalTo: compactHeader.bottomAnchor, constant: 8),
+            lyricsVC.view.topAnchor.constraint(equalTo: compactHeader.bottomAnchor, constant: 4),
             lyricsVC.view.bottomAnchor.constraint(equalTo: centerContainer.bottomAnchor),
             lyricsVC.view.leadingAnchor.constraint(equalTo: centerContainer.leadingAnchor),
             lyricsVC.view.trailingAnchor.constraint(equalTo: centerContainer.trailingAnchor),
 
             // Queue child
-            queueVC.view.topAnchor.constraint(equalTo: compactHeader.bottomAnchor, constant: 8),
+            queueVC.view.topAnchor.constraint(equalTo: compactHeader.bottomAnchor, constant: 4),
             queueVC.view.bottomAnchor.constraint(equalTo: centerContainer.bottomAnchor),
             queueVC.view.leadingAnchor.constraint(equalTo: centerContainer.leadingAnchor),
             queueVC.view.trailingAnchor.constraint(equalTo: centerContainer.trailingAnchor)
@@ -213,12 +214,12 @@ final class NowPlayingViewController: UIViewController {
     // MARK: - Track Info
 
     private func setupTrackInfo() {
-        titleLabel.font = UIFont.systemFont(ofSize: 21, weight: .bold)
+        titleLabel.font = UIFont.systemFont(ofSize: 19, weight: .bold)
         titleLabel.textColor = AppTheme.textPrimary
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(titleLabel)
 
-        artistLabel.font = UIFont.systemFont(ofSize: 18, weight: .regular)
+        artistLabel.font = UIFont.systemFont(ofSize: 16, weight: .regular)
         artistLabel.textColor = AppTheme.accent
         artistLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(artistLabel)
@@ -230,17 +231,17 @@ final class NowPlayingViewController: UIViewController {
         view.addSubview(favoriteButton)
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: centerContainer.bottomAnchor, constant: 16),
+            titleLabel.topAnchor.constraint(equalTo: centerContainer.bottomAnchor, constant: 12),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             titleLabel.trailingAnchor.constraint(equalTo: favoriteButton.leadingAnchor, constant: -12),
-            titleLabel.heightAnchor.constraint(equalToConstant: 28),
+            titleLabel.heightAnchor.constraint(equalToConstant: 26),
 
             artistLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
             artistLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             artistLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
 
             favoriteButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            favoriteButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor, constant: 8),
+            favoriteButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor, constant: 4),
             favoriteButton.widthAnchor.constraint(equalToConstant: 36),
             favoriteButton.heightAnchor.constraint(equalToConstant: 36)
         ])
@@ -271,10 +272,10 @@ final class NowPlayingViewController: UIViewController {
         view.addSubview(remainingLabel)
 
         NSLayoutConstraint.activate([
-            scrubberSlider.topAnchor.constraint(equalTo: artistLabel.bottomAnchor, constant: 16),
+            scrubberSlider.topAnchor.constraint(equalTo: artistLabel.bottomAnchor, constant: 12),
             scrubberSlider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             scrubberSlider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            scrubberSlider.heightAnchor.constraint(equalToConstant: 24),
+            scrubberSlider.heightAnchor.constraint(equalToConstant: 20),
 
             elapsedLabel.topAnchor.constraint(equalTo: scrubberSlider.bottomAnchor, constant: 2),
             elapsedLabel.leadingAnchor.constraint(equalTo: scrubberSlider.leadingAnchor),
@@ -287,36 +288,36 @@ final class NowPlayingViewController: UIViewController {
     // MARK: - Transport
 
     private func setupTransport() {
-        playPauseButton.setImage(IconFactory.play(size: 38), for: .normal)
+        playPauseButton.setImage(IconFactory.play(size: 36), for: .normal)
         playPauseButton.tintColor = AppTheme.textPrimary
         playPauseButton.translatesAutoresizingMaskIntoConstraints = false
         playPauseButton.addTarget(self, action: #selector(togglePlayPauseAction), for: .touchUpInside)
         view.addSubview(playPauseButton)
 
-        nextButton.setImage(IconFactory.next(size: 26), for: .normal)
+        nextButton.setImage(IconFactory.next(size: 24), for: .normal)
         nextButton.tintColor = AppTheme.textPrimary
         nextButton.translatesAutoresizingMaskIntoConstraints = false
         nextButton.addTarget(self, action: #selector(nextAction), for: .touchUpInside)
         view.addSubview(nextButton)
 
-        previousButton.setImage(IconFactory.previous(size: 26), for: .normal)
+        previousButton.setImage(IconFactory.previous(size: 24), for: .normal)
         previousButton.tintColor = AppTheme.textPrimary
         previousButton.translatesAutoresizingMaskIntoConstraints = false
         previousButton.addTarget(self, action: #selector(previousAction), for: .touchUpInside)
         view.addSubview(previousButton)
 
         NSLayoutConstraint.activate([
-            playPauseButton.topAnchor.constraint(equalTo: elapsedLabel.bottomAnchor, constant: 14),
+            playPauseButton.topAnchor.constraint(equalTo: elapsedLabel.bottomAnchor, constant: 10),
             playPauseButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            playPauseButton.widthAnchor.constraint(equalToConstant: 68),
-            playPauseButton.heightAnchor.constraint(equalToConstant: 68),
+            playPauseButton.widthAnchor.constraint(equalToConstant: 64),
+            playPauseButton.heightAnchor.constraint(equalToConstant: 64),
 
-            previousButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -36),
+            previousButton.trailingAnchor.constraint(equalTo: playPauseButton.leadingAnchor, constant: -32),
             previousButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
             previousButton.widthAnchor.constraint(equalToConstant: 44),
             previousButton.heightAnchor.constraint(equalToConstant: 44),
 
-            nextButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: 36),
+            nextButton.leadingAnchor.constraint(equalTo: playPauseButton.trailingAnchor, constant: 32),
             nextButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
             nextButton.widthAnchor.constraint(equalToConstant: 44),
             nextButton.heightAnchor.constraint(equalToConstant: 44)
@@ -343,10 +344,10 @@ final class NowPlayingViewController: UIViewController {
         view.addSubview(volumeSlider)
 
         NSLayoutConstraint.activate([
-            volumeSlider.topAnchor.constraint(equalTo: playPauseButton.bottomAnchor, constant: 16),
+            volumeSlider.topAnchor.constraint(equalTo: playPauseButton.bottomAnchor, constant: 12),
             volumeSlider.leadingAnchor.constraint(equalTo: volumeMinIcon.trailingAnchor, constant: 10),
             volumeSlider.trailingAnchor.constraint(equalTo: volumeMaxIcon.leadingAnchor, constant: -10),
-            volumeSlider.heightAnchor.constraint(equalToConstant: 24),
+            volumeSlider.heightAnchor.constraint(equalToConstant: 20),
 
             volumeMinIcon.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
             volumeMinIcon.centerYAnchor.constraint(equalTo: volumeSlider.centerYAnchor),
@@ -397,13 +398,10 @@ final class NowPlayingViewController: UIViewController {
         stack.addArrangedSubview(queueButton)
 
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: volumeSlider.bottomAnchor, constant: 16),
+            stack.topAnchor.constraint(equalTo: volumeSlider.bottomAnchor, constant: 14),
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -20),
-
-            airPlayButton.widthAnchor.constraint(equalToConstant: 24),
-            airPlayButton.heightAnchor.constraint(equalToConstant: 24)
+            stack.heightAnchor.constraint(equalToConstant: 28)
         ])
     }
 
