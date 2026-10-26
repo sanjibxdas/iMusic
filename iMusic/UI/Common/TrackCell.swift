@@ -72,14 +72,14 @@ final class TrackCell: UITableViewCell {
 
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             titleLabel.leadingAnchor.constraint(equalTo: artworkView.trailingAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(equalTo: durationLabel.leadingAnchor, constant: -8),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: downloadedIcon.leadingAnchor, constant: -6),
 
             artistLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             artistLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             artistLabel.trailingAnchor.constraint(equalTo: durationLabel.leadingAnchor, constant: -8),
             artistLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
 
-            downloadedIcon.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 4),
+            downloadedIcon.trailingAnchor.constraint(equalTo: durationLabel.leadingAnchor, constant: -8),
             downloadedIcon.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
             downloadedIcon.widthAnchor.constraint(equalToConstant: 12),
             downloadedIcon.heightAnchor.constraint(equalToConstant: 12),
@@ -124,6 +124,18 @@ final class TrackCell: UITableViewCell {
                 self?.artworkView.image = image
             }
         }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        artworkView.image = nil
+        titleLabel.text = nil
+        artistLabel.text = nil
+        durationLabel.text = nil
+        downloadedIcon.isHidden = true
+        playingBars.isHidden = true
+        playingBars.setPlaying(false)
+        onMoreTapped = nil
     }
 
     @objc private func moreTapped() {
