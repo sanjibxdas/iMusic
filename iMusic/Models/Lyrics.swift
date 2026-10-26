@@ -29,23 +29,34 @@ struct LyricsDocument: Codable, Equatable {
 
     static func parseLRC(_ lrc: String) -> [LyricLine] {
         var result: [LyricLine] = []
+        let pattern = "\\[(\\d{1,2}):(\\d{2})(?:[.:](\\d{1,3}))?\\]"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
         let rawLines = lrc.components(separatedBy: .newlines)
 
         for raw in rawLines {
             let trimmed = raw.trimmingCharacters(in: .whitespaces)
             guard trimmed.hasPrefix("[") else { continue }
+            let nsStr = trimmed as NSString
+            let matches = regex.matches(in: trimmed, options: [], range: NSRange(location: 0, length: nsStr.length))
+            guard !matches.isEmpty else { continue }
 
-            // Extract timestamp: [mm:ss.xx] or [mm:ss]
-            guard let closeBracketIndex = trimmed.firstIndex(of: "]") else { continue }
-            let timeString = String(trimmed[trimmed.index(after: trimmed.startIndex)..<closeBracketIndex])
-            let text = String(trimmed[trimmed.index(after: closeBracketIndex)...]).trimmingCharacters(in: .whitespaces)
+            let lastMatch = matches.last!
+            let textIndex = lastMatch.range.location + lastMatch.range.length
+            let text = nsStr.substring(from: textIndex).trimmingCharacters(in: .whitespaces)
 
-            let timeParts = timeString.components(separatedBy: ":")
-            if timeParts.count == 2,
-               let minutes = Double(timeParts[0]),
-               let seconds = Double(timeParts[1]) {
-                let totalSeconds = (minutes * 60.0) + seconds
-                result.append(LyricLine(time: totalSeconds, text: text))
+            for match in matches {
+                let minStr = nsStr.substring(with: match.range(at: 1))
+                let secStr = nsStr.substring(with: match.range(at: 2))
+                var ms: Double = 0
+                if match.range(at: 3).location != NSNotFound {
+                    let msRaw = nsStr.substring(with: match.range(at: 3))
+                    let factor = (msRaw.count == 2) ? 100.0 : 1000.0
+                    ms = (Double(msRaw) ?? 0) / factor
+                }
+                if let minutes = Double(minStr), let seconds = Double(secStr) {
+                    let total = (minutes * 60.0) + seconds + ms
+                    result.append(LyricLine(time: total, text: text))
+                }
             }
         }
 

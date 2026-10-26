@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 final class LyricsService {
 
@@ -11,6 +12,17 @@ final class LyricsService {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 8
         self.session = URLSession(configuration: config)
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMemoryWarning),
+            name: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil
+        )
+    }
+
+    @objc private func handleMemoryWarning() {
+        cache.removeAll()
     }
 
     func fetchLyrics(for track: Track, completion: @escaping (LyricsDocument?) -> Void) {
