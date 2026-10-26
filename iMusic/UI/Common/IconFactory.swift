@@ -609,5 +609,4 @@ final class IconFactory {
             ctx.strokePath()
         }
     }
-    }
 }
