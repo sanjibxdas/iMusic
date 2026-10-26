@@ -1,17 +1,25 @@
 import Foundation
 
+private struct CachedStream {
+    let url: URL
+    let timestamp: Date
+    var isExpired: Bool {
+        return Date().timeIntervalSince(timestamp) > (3 * 3600)
+    }
+}
+
 final class StreamResolver {
 
     static let shared = StreamResolver()
 
     private let session: URLSession
-    private var resolvedUrlCache: [String: URL] = [:]
+    private var resolvedUrlCache: [String: CachedStream] = [:]
 
     // Invidious instances with local proxy enabled (?local=true)
     private let invidiousInstances = [
         "https://yt.chocolatemoo53.com",
-        "https://invidious.nerdvpn.de",
-        "https://inv.nadeko.net"
+        "https://iv.ggtyler.dev",
+        "https://inv.vern.cc"
     ]
 
     private init() {
@@ -29,15 +37,15 @@ final class StreamResolver {
             return
         }
 
-        // 2. Check in-memory stream URL cache
-        if let cached = resolvedUrlCache[track.id] {
-            completion(.success(cached))
+        // 2. Check in-memory stream URL cache (with TTL check)
+        if let cached = resolvedUrlCache[track.id], !cached.isExpired {
+            completion(.success(cached.url))
             return
         }
 
         // 3. Check if track already has a playable URL
         if let direct = track.streamUrl, let url = URL(string: direct) {
-            resolvedUrlCache[track.id] = url
+            resolvedUrlCache[track.id] = CachedStream(url: url, timestamp: Date())
             completion(.success(url))
             return
         }
