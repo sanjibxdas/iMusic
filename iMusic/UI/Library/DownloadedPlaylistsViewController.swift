@@ -27,6 +27,8 @@ final class DownloadedPlaylistsViewController: UIViewController, UITableViewData
     private func setupTableView() {
         tableView.backgroundColor = AppTheme.background
         tableView.separatorColor = AppTheme.separator
+        tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 106, right: 0)
+        tableView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: 106, right: 0)
         tableView.dataSource = self
         tableView.delegate = self
         tableView.translatesAutoresizingMaskIntoConstraints = false
