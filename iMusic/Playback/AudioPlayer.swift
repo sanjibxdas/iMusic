@@ -78,6 +78,35 @@ final class AudioPlayer: NSObject {
         } catch {
             print("Failed to configure AVAudioSession: \(error)")
         }
+
+        NotificationCenter.default.addObserver(self, selector: #selector(handleAudioInterruption(_:)), name: AVAudioSession.interruptionNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleRouteChange(_:)), name: AVAudioSession.routeChangeNotification, object: nil)
+    }
+
+    @objc private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+        if type == .began {
+            pause()
+        } else if type == .ended {
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    resume()
+                }
+            }
+        }
+    }
+
+    @objc private func handleRouteChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+        // Pause audio when headphones/AirPods are disconnected
+        if reason == .oldDeviceUnavailable {
+            pause()
+        }
     }
 
     // MARK: - Queue & Playback Control
@@ -240,6 +269,11 @@ final class AudioPlayer: NSObject {
     private func loadCurrentTrackAndPlay() {
         guard let track = currentTrack else { return }
 
+        // Immediately pause current playback so old audio doesn't bleed during resolution
+        player?.pause()
+        isPlaying = false
+        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
+
         StorageManager.shared.recordHistory(track: track)
         NotificationCenter.default.post(name: AudioPlayer.trackDidChange, object: nil)
 
@@ -309,8 +343,7 @@ final class AudioPlayer: NSObject {
         )
 
         let interval = CMTime(value: 1, timescale: 4)
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] _ in
-            self?.updateNowPlaying()
+        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { _ in
             NotificationCenter.default.post(name: AudioPlayer.playbackProgressDidChange, object: nil)
         }
 

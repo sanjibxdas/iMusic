@@ -13,39 +13,39 @@ final class NowPlayingCenter {
 
     func setupRemoteCommands(player: AudioPlayer) {
         commandCenter.playCommand.isEnabled = true
-        commandCenter.playCommand.addTarget { _ in
-            player.resume()
+        commandCenter.playCommand.addTarget { [weak player] _ in
+            player?.resume()
             return .success
         }
 
         commandCenter.pauseCommand.isEnabled = true
-        commandCenter.pauseCommand.addTarget { _ in
-            player.pause()
+        commandCenter.pauseCommand.addTarget { [weak player] _ in
+            player?.pause()
             return .success
         }
 
         commandCenter.togglePlayPauseCommand.isEnabled = true
-        commandCenter.togglePlayPauseCommand.addTarget { _ in
-            player.togglePlayPause()
+        commandCenter.togglePlayPauseCommand.addTarget { [weak player] _ in
+            player?.togglePlayPause()
             return .success
         }
 
         commandCenter.nextTrackCommand.isEnabled = true
-        commandCenter.nextTrackCommand.addTarget { _ in
-            player.next()
+        commandCenter.nextTrackCommand.addTarget { [weak player] _ in
+            player?.next()
             return .success
         }
 
         commandCenter.previousTrackCommand.isEnabled = true
-        commandCenter.previousTrackCommand.addTarget { _ in
-            player.previous()
+        commandCenter.previousTrackCommand.addTarget { [weak player] _ in
+            player?.previous()
             return .success
         }
 
         commandCenter.changePlaybackPositionCommand.isEnabled = true
-        commandCenter.changePlaybackPositionCommand.addTarget { event in
+        commandCenter.changePlaybackPositionCommand.addTarget { [weak player] event in
             guard let posEvent = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            player.seek(to: posEvent.positionTime)
+            player?.seek(to: posEvent.positionTime)
             return .success
         }
     }
