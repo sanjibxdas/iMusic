@@ -33,26 +33,54 @@ jobs:
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=NO \
             IPHONEOS_DEPLOYMENT_TARGET=12.0 \
+            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=NO \
+            SWIFT_OPTIMIZATION_LEVEL="-O" \
+            SWIFT_COMPILATION_MODE=wholemodule \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             archive
 
+      - name: Inspect archive
+        run: |
+          APP="build/iMusic.xcarchive/Products/Applications/iMusic.app"
+          echo "--- app size:"; du -sh "$APP"
+          echo "--- frameworks:"; ls -la "$APP/Frameworks" 2>/dev/null || echo "none (Swift runtime resolved from iOS)"
+
       - name: Package IPA
         run: |
+          APP="build/iMusic.xcarchive/Products/Applications/iMusic.app"
           mkdir -p Payload
-          cp -R "build/iMusic.xcarchive/Products/Applications/iMusic.app" Payload/
-          codesign -s - --force --deep Payload/iMusic.app
+          cp -R "$APP" Payload/
+          # Any Swift runtime dylibs we do not embed must not linger; a nested
+          # Apple-signed dylib is rejected by installd on a sideloaded bundle.
+          if [ -d "Payload/iMusic.app/Frameworks" ]; then
+            find "Payload/iMusic.app/Frameworks" -name "libswift*.dylib" -print | wc -l | xargs echo "stray swift dylibs:"
+            find "Payload/iMusic.app/Frameworks" -name "libswift*.dylib" -delete
+            rmdir "Payload/iMusic.app/Frameworks" 2>/dev/null || true
+          fi
+          ls "Payload/iMusic.app/Frameworks" 2>/dev/null || echo "Frameworks directory absent - good"
+          # Sign inside-out: nested code first, bundle last, without --deep.
+          if [ -d "Payload/iMusic.app/Frameworks" ]; then
+            find "Payload/iMusic.app/Frameworks" -type f \( -name "*.dylib" -o -name "*.framework" \) -exec codesign -s - --force {} \;
+          fi
+          codesign -s - --force "Payload/iMusic.app"
+          codesign --verify --deep --strict --verbose=2 "Payload/iMusic.app"
           zip -qr iMusic.ipa Payload
-          echo "IPA packaging complete: iMusic.ipa"
+          echo "IPA packaging complete: $(du -h iMusic.ipa | cut -f1)"
 
       - name: Package DEB (Sileo / Filza Compliant)
         run: |
+          APP="build/iMusic.xcarchive/Products/Applications/iMusic.app"
           mkdir -p deb_package/Applications
-          cp -R "build/iMusic.xcarchive/Products/Applications/iMusic.app" deb_package/Applications/
-          chmod 755 deb_package/Applications/iMusic.app/iMusic
-          codesign -s - --force --deep deb_package/Applications/iMusic.app
+          cp -R "$APP" deb_package/Applications/
+          chmod 755 "deb_package/Applications/iMusic.app/iMusic"
+          if [ -d "deb_package/Applications/iMusic.app/Frameworks" ]; then
+            find "deb_package/Applications/iMusic.app/Frameworks" -type f \( -name "*.dylib" -o -name "*.framework" \) -exec codesign -s - --force {} \;
+          fi
+          codesign -s - --force "deb_package/Applications/iMusic.app"
+          codesign --verify --deep --strict --verbose=2 "deb_package/Applications/iMusic.app"
 
           mkdir -p deb_root
           printf "2.0\n" > deb_root/debian-binary
