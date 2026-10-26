@@ -16,26 +16,33 @@ final class StreamResolver {
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 12
-        config.timeoutIntervalForResource = 25
+        config.timeoutIntervalForRequest = 6
+        config.timeoutIntervalForResource = 15
         self.session = URLSession(configuration: config)
     }
 
     func resolveStreamURL(for track: Track, completion: @escaping (Result<URL, Error>) -> Void) {
-        // 1. Check in-memory cache
+        // 1. Check local download on disk first (0ms latency!)
+        let localFile = DownloadManager.shared.localAudioURL(for: track.id)
+        if FileManager.default.fileExists(atPath: localFile.path) {
+            completion(.success(localFile))
+            return
+        }
+
+        // 2. Check in-memory stream URL cache
         if let cached = resolvedUrlCache[track.id] {
             completion(.success(cached))
             return
         }
 
-        // 2. Check if track has a direct streamUrl already
+        // 3. Check if track already has a playable URL
         if let direct = track.streamUrl, let url = URL(string: direct) {
             resolvedUrlCache[track.id] = url
             completion(.success(url))
             return
         }
 
-        // 3. If ID is an iTunes placeholder ("itunes_..."), first search YouTube for the real video ID
+        // 4. If ID is an iTunes placeholder ("itunes_..."), search YouTube for the real video ID
         if track.id.hasPrefix("itunes_") {
             let query = "\(track.title) \(track.artist)"
             MusicAPIService.shared.search(query: query) { [weak self] searchResult in
@@ -47,13 +54,13 @@ final class StreamResolver {
                     }
                     fallthrough
                 default:
-                    completion(.failure(NSError(domain: "StreamResolver", code: -404, userInfo: [NSLocalizedDescriptionKey: "Could not find YouTube stream for song"])))
+                    completion(.failure(NSError(domain: "StreamResolver", code: -404, userInfo: [NSLocalizedDescriptionKey: "Could not find stream for song"])))
                 }
             }
             return
         }
 
-        // 4. Resolve directly using YouTube Video ID
+        // 5. Direct YouTube ID resolution
         resolveDirectYouTubeId(track.id, completion: completion)
     }
 
@@ -69,7 +76,6 @@ final class StreamResolver {
                 self?.resolvedUrlCache[videoId] = streamUrl
                 completion(.success(streamUrl))
             case .failure:
-                // Fallback: try raw Innertube player endpoint
                 self?.resolveViaEmbeddedInnertube(videoId: videoId) { embeddedResult in
                     switch embeddedResult {
                     case .success(let streamUrl):
@@ -115,7 +121,6 @@ final class StreamResolver {
                 return
             }
 
-            // Filter audio formats
             let audioFormats = adaptive.filter { fmt in
                 guard let type = fmt["type"] as? String else { return false }
                 return type.hasPrefix("audio/")

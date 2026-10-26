@@ -25,37 +25,74 @@ While modern streaming applications require iOS 15, 16, or later, iMusic brings 
 
 ---
 
-## Features
+## Navigation & Page Structure
 
-- **Apple Music iOS 12 Design**:
-  - **Library**: Playlists, Artists, Albums, Songs, Favorites, and Recently Added history.
-  - **For You**: Curated heavy rotation cards, favorites mix, and editorial playlists.
-  - **Browse**: Featured editorial playlists and Top Global Charts.
-  - **Radio**: Apple Music 1 live radio tile alongside genre radio stations.
-  - **Search**: Fast song & artist search with category filter chips (Songs, Artists, Albums, Playlists) and trending suggestions.
+### 1. Home
+- **Recent**: Quick access to your last played songs.
+- **Listen Again**: Favorites and frequently replayed music.
+- **Quick Picks**: Dynamic recommendations based on your listening history.
+- **Featured Playlists for You**: Curated high-rotation playlists.
+- **Fresh Finds & Old Favorites**: Discover trending releases alongside timeless hits.
+- **Hide Shorts Option**: Dedicated toggle in the navigation bar to hide sub-60-second shorts from your library and albums.
+
+### 2. Explore (Moods, Genres, and Categories)
+- **Moods & Activities**: Commute, Energize, Feel Good, Focus, Gaming, Party, Romance, Sad, Sleep, Workout.
+- **Genres & Regions**: 38+ regional and genre categories including Bengali, Hindi, Punjabi, Tamil, Telugu, Bhojpuri, Desi Hip Hop, Ghazal, Indian Indie, Pop, Rock, K-Pop, J-Pop, Latin, and more.
+- Tapping any category opens a dedicated view with curated songs and playlists.
+
+### 3. Library
+- **Downloaded Files**: Offline music folder to listen to downloaded songs directly without an internet connection.
+- **Local Music**: Fast playback of locally saved songs.
+- **Downloaded Playlists**: Manage offline playlists with an option to import playlists from YouTube URLs or JSON backups.
+- **Liked Music & Liked Songs**: Complete library of your favorited tracks.
+- **Artists You Follow & Recommendations**: Follow your favorite artists.
+- **Subscriptions & Podcasts**: Explore podcasts and subscribed releases.
+- **Top-Right Account Menu**:
+  - **Add YouTube Music Account**: Connect via web sign-in or manual cookie paste to sync liked songs, playlists, and recommendations.
+  - **Manage Account**: View connected account details and sign out.
+  - **Settings**: Comprehensive audio and download preferences.
+
+### 4. Search
+- Live searching across songs, artists, albums, and playlists.
+- Filter chips for instant categorization (All, Songs, Albums, Artists, Playlists).
+- Trending search suggestions.
+
+---
+
+## Playback & Player Features
+
+- **Instant Playback (No Buffering Delay)**:
+  - `automaticallyWaitsToMinimizeStalling = false` and pre-warmed audio buffers start playback within 1-2 seconds (or 0ms for downloaded tracks).
+  - Background stream pre-resolving loads the next track before the current one finishes.
+- **Responsive Small-Screen Layout (iPhone 6)**:
+  - Optimized for 375 × 667 pt displays with non-clipping, proportional constraints.
+  - Fully scrollable content view to ensure zero overlap even with large text or accessibility modes.
+- **Multi-Source Synced Lyrics**:
+  - Line-by-line synchronized scrolling lyrics via LRCLIB with intelligent title cleaning (strips `Official Video`, `feat`, and bracketed tags for 99%+ match rate).
+  - YouTube transcript fallback when studio lyrics are not cataloged.
+  - Interactive tap-to-seek directly from any lyric line.
+- **Working Software Volume Slider**:
+  - Live volume slider modulating `AudioPlayer.shared.volume` directly on `AVPlayer`.
+- **Offline Download Manager**:
+  - Download individual tracks or entire playlists directly to local storage (`.m4a`).
+  - Track download states (`.notDownloaded`, `.downloading`, `.downloaded`) with status indicators.
 - **Floating Mini-Player**:
-  - Docked above the bottom tab bar with live progress indicator, track details, and instant transport controls.
-  - Tap or swipe up to expand seamlessly into the Full Now Playing modal.
-- **Full Now Playing Screen**:
-  - High-resolution album artwork with Apple's iconic playback scaling animation (artwork gently scales down on pause and expands on play).
-  - Smooth scrolling marquee labels (`MarqueeLabel`) for long track titles.
-  - Scrubbing slider with real-time elapsed/remaining countdowns and volume control.
-  - Center state switcher: toggle instantly between **Album Artwork**, **Synchronized Scrolling Lyrics**, and the **Up Next Queue**.
-  - Shuffle, Repeat (Off, All, One), AirPlay route picker, and Favorites button.
-- **Synchronized Lyrics**:
-  - Real-time, line-by-line synchronized lyrics powered by **LRCLIB**.
-  - Auto-scrolling lyrics with tap-to-seek functionality.
-- **Audio Streaming Engine**:
-  - Multi-tier stream resolution for YouTube Music with local proxy streaming to prevent Google Video 403 Forbidden IP-locking errors.
-  - Direct hardware-accelerated `m4a` (AAC) playback via `AVPlayer`.
-- **Background Playback & Lock-Screen Controls**:
-  - Full `AVAudioSession` background playback (`.playback` category).
-  - Complete `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter` integration (Lock Screen, Control Center, headphone controls, and Apple Watch).
-- **Engineered for iPhone 6 (1 GB RAM Budget)**:
-  - Zero heavy third-party dependencies (no CocoaPods, SPM bloat, or Electron/WebViews).
-  - Strict 20 MB `NSCache` memory threshold with automated eviction on memory pressure warnings to prevent iOS Jetsam kills.
-  - Custom CoreGraphics vector glyphs (`IconFactory`) that render crisply on Retina `@2x` displays without needing iOS 13+ SF Symbols.
-  - Storyboard-based launch screen eliminating the iOS 12 letterboxing hazard.
+  - Frosted translucent dock above the tab bar with progress line, track title, artist, and transport controls.
+
+---
+
+## Settings & Audio Preferences
+
+- **Download Quality**: Standard (128 kbps), High (256 kbps), and Lossless (Hi-Fi).
+- **Download over Wi-Fi Only**: Prevents cellular data consumption when enabled.
+- **Output Precision**: 16-bit PCM or 32-bit Float.
+- **Crossfade**: Configurable transition duration between tracks (Off, 2s, 4s, 6s, 8s, 12s).
+- **Export / Import Data**:
+  - Export all favorites, playlists, history, and settings to an `iMusic_Backup.json` file.
+  - Import previous backups upon updating or reinstalling to restore your library automatically.
+- **Play Next on Swipe**: Quick swipe gesture support.
+- **App Language**: English, Hindi, Bengali, Spanish, French, German, Japanese.
+- **Smart Audio Alignment**: Analyzes audio waveforms and normalizes playback formats.
 
 ---
 
@@ -78,48 +115,6 @@ Every commit to `main` automatically compiles and packages two production distri
 ### Option 3: Sideloadly / AltStore / 3uTools (`.ipa`)
 1. Connect your iPhone 6 to your computer via USB.
 2. Open Sideloadly or 3uTools, select `iMusic.ipa`, and click **Start**.
-
----
-
-## Architecture & Project Structure
-
-```
-iMusic/
-├── .github/workflows/
-│   └── build.yml               # Xcode 15.4 macOS-14 automated CI build pipeline
-├── iMusic/
-│   ├── App/
-│   │   ├── AppDelegate.swift   # Classic iOS 12 UIWindow lifecycle
-│   │   └── AppTheme.swift      # Apple Music dark palette & typography
-│   ├── Base.lproj/
-│   │   └── LaunchScreen.storyboard # Prevents SpringBoard letterboxing
-│   ├── Models/
-│   │   ├── Track.swift         # Core track model
-│   │   ├── MediaModels.swift   # Artist, Album, Playlist models
-│   │   └── Lyrics.swift        # LRC timestamp parser & document model
-│   ├── Services/
-│   │   ├── StreamResolver.swift# Invidious & Innertube stream resolution
-│   │   ├── MusicAPIService.swift # YouTube Music search & browse parser
-│   │   ├── LyricsService.swift # LRCLIB synchronized lyrics API
-│   │   ├── ImageLoader.swift   # Memory-capped NSCache image loader
-│   │   └── StorageManager.swift# JSON persistence for favorites & history
-│   ├── Playback/
-│   │   ├── AudioPlayer.swift   # AVPlayer queue & background manager
-│   │   └── NowPlayingCenter.swift # Lock screen & MPRemoteCommandCenter
-│   ├── UI/
-│   │   ├── Common/             # IconFactory, MarqueeLabel, TrackCell, etc.
-│   │   ├── Navigation/         # MainTabBarController & RootContainer
-│   │   ├── MiniPlayer/         # Floating translucent mini player
-│   │   ├── NowPlaying/         # Full player modal, lyrics, & queue views
-│   │   ├── Library/            # User library & playlists
-│   │   ├── ForYou/             # Curated mixes & heavy rotation
-│   │   ├── Browse/             # Top charts & featured sections
-│   │   ├── Radio/              # Beats 1 / Apple Music 1 & genre stations
-│   │   └── Search/             # Search controller & filter chips
-│   ├── Assets.xcassets/        # AppIcon asset catalog
-│   └── Info.plist
-└── iMusic.xcodeproj/           # Xcode project targeting iOS 12.0 (arm64)
-```
 
 ---
 

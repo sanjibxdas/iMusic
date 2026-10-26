@@ -363,6 +363,51 @@ final class IconFactory {
 
     // MARK: - Tab Bar Icons
 
+    static func tabHome(size: CGFloat = 25) -> UIImage {
+        return cached(key: "tab_home", size: CGSize(width: size, height: size)) { ctx, rect in
+            let s = size
+            let path = UIBezierPath()
+            // Roof
+            path.move(to: CGPoint(x: s * 0.15, y: s * 0.45))
+            path.addLine(to: CGPoint(x: s * 0.50, y: s * 0.16))
+            path.addLine(to: CGPoint(x: s * 0.85, y: s * 0.45))
+            // Body
+            path.addLine(to: CGPoint(x: s * 0.80, y: s * 0.84))
+            path.addLine(to: CGPoint(x: s * 0.20, y: s * 0.84))
+            path.close()
+
+            path.lineWidth = s * 0.08
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            UIColor.white.setStroke()
+            path.stroke()
+        }
+    }
+
+    static func tabExplore(size: CGFloat = 25) -> UIImage {
+        return cached(key: "tab_explore", size: CGSize(width: size, height: size)) { ctx, rect in
+            let s = size
+            let center = CGPoint(x: s * 0.5, y: s * 0.5)
+            let radius = s * 0.38
+
+            // Outer compass circle
+            let circle = UIBezierPath(arcCenter: center, radius: radius, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+            circle.lineWidth = s * 0.08
+            UIColor.white.setStroke()
+            circle.stroke()
+
+            // Compass needle
+            let needle = UIBezierPath()
+            needle.move(to: CGPoint(x: s * 0.5, y: s * 0.22))
+            needle.addLine(to: CGPoint(x: s * 0.62, y: s * 0.50))
+            needle.addLine(to: CGPoint(x: s * 0.5, y: s * 0.78))
+            needle.addLine(to: CGPoint(x: s * 0.38, y: s * 0.50))
+            needle.close()
+            needle.lineWidth = s * 0.06
+            needle.stroke()
+        }
+    }
+
     static func tabLibrary(size: CGFloat = 25) -> UIImage {
         return cached(key: "tab_library", size: CGSize(width: size, height: size)) { ctx, rect in
             let s = size
@@ -459,5 +504,110 @@ final class IconFactory {
             ctx.addLine(to: CGPoint(x: s * 0.82, y: s * 0.82))
             ctx.strokePath()
         }
+    }
+
+    // MARK: - Download & Account Icons
+
+    static func download(size: CGFloat = 22) -> UIImage {
+        return cached(key: "download", size: CGSize(width: size, height: size)) { ctx, rect in
+            let s = size
+            let stroke = s * 0.08
+            ctx.setStrokeColor(UIColor.white.cgColor)
+            ctx.setLineWidth(stroke)
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+
+            // Down arrow
+            ctx.move(to: CGPoint(x: s * 0.50, y: s * 0.18))
+            ctx.addLine(to: CGPoint(x: s * 0.50, y: s * 0.62))
+            ctx.move(to: CGPoint(x: s * 0.32, y: s * 0.46))
+            ctx.addLine(to: CGPoint(x: s * 0.50, y: s * 0.62))
+            ctx.addLine(to: CGPoint(x: s * 0.68, y: s * 0.46))
+            ctx.strokePath()
+
+            // Bottom tray
+            ctx.move(to: CGPoint(x: s * 0.22, y: s * 0.76))
+            ctx.addLine(to: CGPoint(x: s * 0.22, y: s * 0.84))
+            ctx.addLine(to: CGPoint(x: s * 0.78, y: s * 0.84))
+            ctx.addLine(to: CGPoint(x: s * 0.78, y: s * 0.76))
+            ctx.strokePath()
+        }
+    }
+
+    static func downloaded(size: CGFloat = 22) -> UIImage {
+        return cached(key: "downloaded", size: CGSize(width: size, height: size)) { ctx, rect in
+            let s = size
+            let stroke = s * 0.085
+            ctx.setStrokeColor(UIColor.white.cgColor)
+            ctx.setLineWidth(stroke)
+            ctx.setLineCap(.round)
+            ctx.setLineJoin(.round)
+
+            // Circle checkmark
+            let circle = UIBezierPath(arcCenter: CGPoint(x: s * 0.5, y: s * 0.5), radius: s * 0.40, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+            circle.lineWidth = stroke
+            circle.stroke()
+
+            // Checkmark
+            let check = UIBezierPath()
+            check.move(to: CGPoint(x: s * 0.32, y: s * 0.50))
+            check.addLine(to: CGPoint(x: s * 0.45, y: s * 0.64))
+            check.addLine(to: CGPoint(x: s * 0.68, y: s * 0.38))
+            check.lineWidth = stroke
+            check.lineCapStyle = .round
+            check.lineJoinStyle = .round
+            check.stroke()
+        }
+    }
+
+    static func userProfile(size: CGFloat = 24) -> UIImage {
+        return cached(key: "user_profile", size: CGSize(width: size, height: size)) { ctx, rect in
+            let s = size
+            let stroke = s * 0.08
+            ctx.setStrokeColor(UIColor.white.cgColor)
+            ctx.setLineWidth(stroke)
+
+            // Head
+            let head = UIBezierPath(arcCenter: CGPoint(x: s * 0.5, y: s * 0.36), radius: s * 0.18, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+            head.lineWidth = stroke
+            head.stroke()
+
+            // Shoulders arc
+            ctx.addArc(center: CGPoint(x: s * 0.5, y: s * 0.90), radius: s * 0.36, startAngle: -.pi * 0.85, endAngle: -.pi * 0.15, clockwise: false)
+            ctx.strokePath()
+        }
+    }
+
+    static func settings(size: CGFloat = 24) -> UIImage {
+        return cached(key: "settings", size: CGSize(width: size, height: size)) { ctx, rect in
+            let s = size
+            let stroke = s * 0.08
+            ctx.setStrokeColor(UIColor.white.cgColor)
+            ctx.setLineWidth(stroke)
+            ctx.setLineCap(.round)
+
+            // Outer ring
+            let ring = UIBezierPath(arcCenter: CGPoint(x: s * 0.5, y: s * 0.5), radius: s * 0.34, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+            ring.lineWidth = stroke
+            ring.stroke()
+
+            // Inner circle
+            let inner = UIBezierPath(arcCenter: CGPoint(x: s * 0.5, y: s * 0.5), radius: s * 0.14, startAngle: 0, endAngle: .pi * 2, clockwise: true)
+            inner.lineWidth = stroke
+            inner.stroke()
+
+            // 6 gear cogs
+            for i in 0..<6 {
+                let angle = (CGFloat(i) * .pi / 3.0)
+                let x1 = s * 0.5 + cos(angle) * (s * 0.34)
+                let y1 = s * 0.5 + sin(angle) * (s * 0.34)
+                let x2 = s * 0.5 + cos(angle) * (s * 0.44)
+                let y2 = s * 0.5 + sin(angle) * (s * 0.44)
+                ctx.move(to: CGPoint(x: x1, y: y1))
+                ctx.addLine(to: CGPoint(x: x2, y: y2))
+            }
+            ctx.strokePath()
+        }
+    }
     }
 }

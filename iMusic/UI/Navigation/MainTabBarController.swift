@@ -9,32 +9,27 @@ final class MainTabBarController: UITabBarController {
     }
 
     private func setupTabs() {
-        // Tab 1: Library
+        // Tab 1: Home
+        let homeVC = HomeViewController()
+        let homeNav = UINavigationController(rootViewController: homeVC)
+        homeNav.tabBarItem = UITabBarItem(title: "Home", image: IconFactory.tabHome(size: 24), tag: 0)
+
+        // Tab 2: Explore
+        let exploreVC = ExploreViewController()
+        let exploreNav = UINavigationController(rootViewController: exploreVC)
+        exploreNav.tabBarItem = UITabBarItem(title: "Explore", image: IconFactory.tabExplore(size: 24), tag: 1)
+
+        // Tab 3: Library
         let libraryVC = LibraryViewController()
         let libraryNav = UINavigationController(rootViewController: libraryVC)
-        libraryNav.tabBarItem = UITabBarItem(title: "Library", image: IconFactory.tabLibrary(size: 24), tag: 0)
+        libraryNav.tabBarItem = UITabBarItem(title: "Library", image: IconFactory.tabLibrary(size: 24), tag: 2)
 
-        // Tab 2: For You
-        let forYouVC = ForYouViewController()
-        let forYouNav = UINavigationController(rootViewController: forYouVC)
-        forYouNav.tabBarItem = UITabBarItem(title: "For You", image: IconFactory.tabForYou(size: 24), tag: 1)
-
-        // Tab 3: Browse
-        let browseVC = BrowseViewController()
-        let browseNav = UINavigationController(rootViewController: browseVC)
-        browseNav.tabBarItem = UITabBarItem(title: "Browse", image: IconFactory.tabBrowse(size: 24), tag: 2)
-
-        // Tab 4: Radio
-        let radioVC = RadioViewController()
-        let radioNav = UINavigationController(rootViewController: radioVC)
-        radioNav.tabBarItem = UITabBarItem(title: "Radio", image: IconFactory.tabRadio(size: 24), tag: 3)
-
-        // Tab 5: Search
+        // Tab 4: Search
         let searchVC = SearchViewController()
         let searchNav = UINavigationController(rootViewController: searchVC)
-        searchNav.tabBarItem = UITabBarItem(title: "Search", image: IconFactory.tabSearch(size: 24), tag: 4)
+        searchNav.tabBarItem = UITabBarItem(title: "Search", image: IconFactory.tabSearch(size: 24), tag: 3)
 
-        viewControllers = [libraryNav, forYouNav, browseNav, radioNav, searchNav]
+        viewControllers = [homeNav, exploreNav, libraryNav, searchNav]
     }
 
     private func setupAppearance() {

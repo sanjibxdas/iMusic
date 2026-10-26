@@ -17,6 +17,7 @@ final class AudioPlayer: NSObject {
     static let playbackStateDidChange = Notification.Name("AudioPlayerPlaybackStateDidChange")
     static let playbackProgressDidChange = Notification.Name("AudioPlayerPlaybackProgressDidChange")
     static let queueDidChange = Notification.Name("AudioPlayerQueueDidChange")
+    static let volumeDidChange = Notification.Name("AudioPlayerVolumeDidChange")
 
     // State
     private(set) var queue: [Track] = []
@@ -25,6 +26,18 @@ final class AudioPlayer: NSObject {
     private(set) var repeatMode: RepeatMode = .off
     private(set) var isShuffled: Bool = false
     private var originalQueue: [Track] = []
+
+    var volume: Float {
+        get {
+            return player?.volume ?? SettingsManager.shared.softwareVolume
+        }
+        set {
+            let clamped = max(0.0, min(1.0, newValue))
+            player?.volume = clamped
+            SettingsManager.shared.softwareVolume = clamped
+            NotificationCenter.default.post(name: AudioPlayer.volumeDidChange, object: nil)
+        }
+    }
 
     var currentTrack: Track? {
         guard currentIndex >= 0 && currentIndex < queue.count else { return nil }
@@ -173,7 +186,6 @@ final class AudioPlayer: NSObject {
     func previous() {
         guard !queue.isEmpty else { return }
 
-        // If song has played for more than 3 seconds, restart it
         if currentTime > 3.0 {
             seek(to: 0)
             return
@@ -228,11 +240,9 @@ final class AudioPlayer: NSObject {
     private func loadCurrentTrackAndPlay() {
         guard let track = currentTrack else { return }
 
-        // Record in history & notify UI
         StorageManager.shared.recordHistory(track: track)
         NotificationCenter.default.post(name: AudioPlayer.trackDidChange, object: nil)
 
-        // Load artwork for Lock Screen
         currentArtworkImage = nil
         if !track.artworkUrl.isEmpty {
             ImageLoader.shared.loadImage(from: track.artworkUrl) { [weak self] image in
@@ -241,19 +251,29 @@ final class AudioPlayer: NSObject {
             }
         }
 
-        // If stream URL is already known
-        if let streamUrlStr = track.streamUrl, let streamUrl = URL(string: streamUrlStr) {
-            startPlayback(url: streamUrl)
+        // 1. Check local download first for instant 0ms playback
+        let localFile = DownloadManager.shared.localAudioURL(for: track.id)
+        if FileManager.default.fileExists(atPath: localFile.path) {
+            startPlayback(url: localFile)
+            prewarmNextTrack()
             return
         }
 
-        // Resolve stream URL dynamically
+        // 2. If stream URL is already known
+        if let streamUrlStr = track.streamUrl, let streamUrl = URL(string: streamUrlStr) {
+            startPlayback(url: streamUrl)
+            prewarmNextTrack()
+            return
+        }
+
+        // 3. Resolve stream URL
         StreamResolver.shared.resolveStreamURL(for: track) { [weak self] result in
             DispatchQueue.main.async {
                 guard let self = self, self.currentTrack?.id == track.id else { return }
                 switch result {
                 case .success(let streamURL):
                     self.startPlayback(url: streamURL)
+                    self.prewarmNextTrack()
                 case .failure(let error):
                     print("Stream resolve failed for \(track.title): \(error)")
                     self.isPlaying = false
@@ -268,13 +288,19 @@ final class AudioPlayer: NSObject {
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
 
         let item = AVPlayerItem(url: url)
+        // High responsiveness on iOS 12: low forward buffer prevents 10s stalling
+        item.preferredForwardBufferDuration = 3.0
+
         if player == nil {
             player = AVPlayer(playerItem: item)
         } else {
             player?.replaceCurrentItem(with: item)
         }
 
-        // Register end-of-track notification
+        // Disable waiting for full buffer so playback begins instantly!
+        player?.automaticallyWaitsToMinimizeStalling = false
+        player?.volume = SettingsManager.shared.softwareVolume
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(playerItemDidReachEnd),
@@ -282,7 +308,6 @@ final class AudioPlayer: NSObject {
             object: item
         )
 
-        // Add periodic time observer (every 250ms)
         let interval = CMTime(value: 1, timescale: 4)
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] _ in
             self?.updateNowPlaying()
@@ -293,6 +318,12 @@ final class AudioPlayer: NSObject {
         isPlaying = true
         updateNowPlaying()
         NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
+    }
+
+    private func prewarmNextTrack() {
+        guard currentIndex + 1 < queue.count else { return }
+        let nextTrack = queue[currentIndex + 1]
+        StreamResolver.shared.resolveStreamURL(for: nextTrack) { _ in }
     }
 
     @objc private func playerItemDidReachEnd() {

@@ -22,9 +22,23 @@ final class PlaylistDetailViewController: UIViewController, UITableViewDataSourc
         super.viewDidLoad()
         view.backgroundColor = AppTheme.background
         navigationItem.largeTitleDisplayMode = .never
+        setupNavigation()
         setupHeader()
         setupTableView()
         registerObservers()
+    }
+
+    private func setupNavigation() {
+        let downloadBtn = UIBarButtonItem(image: IconFactory.download(size: 20), style: .plain, target: self, action: #selector(downloadAllAction))
+        downloadBtn.tintColor = AppTheme.accent
+        navigationItem.rightBarButtonItem = downloadBtn
+    }
+
+    @objc private func downloadAllAction() {
+        DownloadManager.shared.downloadPlaylist(tracks: playlist.tracks)
+        let alert = UIAlertController(title: "Downloading Playlist", message: "\(playlist.tracks.count) tracks are queued for offline download.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+        present(alert, animated: true, completion: nil)
     }
 
     private func setupHeader() {
@@ -179,6 +193,14 @@ final class PlaylistDetailViewController: UIViewController, UITableViewDataSourc
         }))
         alert.addAction(UIAlertAction(title: "Add to Queue", style: .default, handler: { _ in
             AudioPlayer.shared.addToQueue(track)
+        }))
+        let isDownloaded = DownloadManager.shared.isDownloaded(trackId: track.id)
+        alert.addAction(UIAlertAction(title: isDownloaded ? "Remove Download" : "Download", style: .default, handler: { _ in
+            if isDownloaded {
+                DownloadManager.shared.deleteDownload(trackId: track.id)
+            } else {
+                DownloadManager.shared.download(track: track)
+            }
         }))
         let isFav = StorageManager.shared.isFavorite(trackId: track.id)
         alert.addAction(UIAlertAction(title: isFav ? "Unfavorite" : "Favorite", style: .default, handler: { _ in

@@ -10,6 +10,7 @@ final class TrackCell: UITableViewCell {
     private let titleLabel = UILabel()
     private let artistLabel = UILabel()
     private let durationLabel = UILabel()
+    private let downloadedIcon = UIImageView()
     private let playingBars = NowPlayingBarsView(frame: CGRect(x: 0, y: 0, width: 14, height: 14))
     private let moreButton = UIButton(type: .custom)
 
@@ -41,6 +42,12 @@ final class TrackCell: UITableViewCell {
         artistLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(artistLabel)
 
+        downloadedIcon.image = IconFactory.downloaded(size: 11)
+        downloadedIcon.tintColor = AppTheme.textTertiary
+        downloadedIcon.isHidden = true
+        downloadedIcon.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(downloadedIcon)
+
         durationLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
         durationLabel.textColor = AppTheme.textTertiary
         durationLabel.textAlignment = .right
@@ -69,8 +76,13 @@ final class TrackCell: UITableViewCell {
 
             artistLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             artistLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            artistLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+            artistLabel.trailingAnchor.constraint(equalTo: durationLabel.leadingAnchor, constant: -8),
             artistLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+
+            downloadedIcon.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 4),
+            downloadedIcon.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            downloadedIcon.widthAnchor.constraint(equalToConstant: 12),
+            downloadedIcon.heightAnchor.constraint(equalToConstant: 12),
 
             durationLabel.trailingAnchor.constraint(equalTo: moreButton.leadingAnchor, constant: -8),
             durationLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
@@ -92,6 +104,7 @@ final class TrackCell: UITableViewCell {
         titleLabel.text = track.title
         artistLabel.text = track.artist.isEmpty ? "Unknown Artist" : track.artist
         durationLabel.text = track.formattedDuration
+        downloadedIcon.isHidden = !DownloadManager.shared.isDownloaded(trackId: track.id)
 
         if isCurrentlyPlaying {
             titleLabel.textColor = AppTheme.accent
