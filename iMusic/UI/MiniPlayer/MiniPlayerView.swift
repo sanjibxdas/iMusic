@@ -110,7 +110,12 @@ final class MiniPlayerView: UIView {
         ])
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        tap.cancelsTouchesInView = false
         addGestureRecognizer(tap)
+
+        let swipeUp = UISwipeGestureRecognizer(target: self, action: #selector(handleTap))
+        swipeUp.direction = .up
+        addGestureRecognizer(swipeUp)
     }
 
     private func registerObservers() {
