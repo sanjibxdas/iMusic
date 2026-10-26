@@ -153,6 +153,14 @@ final class MusicAPIService {
                             seenIds.insert(track.id)
                             tracks.append(track)
                         }
+                    } else if let innerShelf = item["musicShelfRenderer"] as? [String: Any],
+                              let innerItems = innerShelf["contents"] as? [[String: Any]] {
+                        for innerItem in innerItems {
+                            if let track = parseResponsiveListItem(innerItem), !seenIds.contains(track.id) {
+                                seenIds.insert(track.id)
+                                tracks.append(track)
+                            }
+                        }
                     }
                 }
             }
@@ -192,6 +200,14 @@ final class MusicAPIService {
                let id = watch["videoId"] as? String {
                 videoId = id
             }
+        }
+        if videoId.isEmpty,
+           let flexColumns = listItem["flexColumns"] as? [[String: Any]],
+           let runs = ((flexColumns.first?["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any])?["text"] as? [String: Any])?["runs"] as? [[String: Any]],
+           let nav = runs.first?["navigationEndpoint"] as? [String: Any],
+           let watch = nav["watchEndpoint"] as? [String: Any],
+           let id = watch["videoId"] as? String {
+            videoId = id
         }
 
         guard !videoId.isEmpty else { return nil }
@@ -245,7 +261,9 @@ final class MusicAPIService {
     // MARK: - iTunes Fallback Search
 
     private func searchITunes(query: String, completion: @escaping (Result<[Track], Error>) -> Void) {
-        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&+=?")
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: allowed),
               let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&entity=song&limit=25") else {
             completion(.failure(NSError(domain: "MusicAPI", code: -1, userInfo: nil)))
             return

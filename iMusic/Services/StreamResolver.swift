@@ -73,21 +73,21 @@ final class StreamResolver {
     }
 
     func resolveDirectYouTubeId(_ videoId: String, completion: @escaping (Result<URL, Error>) -> Void) {
-        if let cached = resolvedUrlCache[videoId] {
-            completion(.success(cached))
+        if let cached = resolvedUrlCache[videoId], !cached.isExpired {
+            completion(.success(cached.url))
             return
         }
 
         resolveViaInvidious(videoId: videoId, instanceIndex: 0) { [weak self] result in
             switch result {
             case .success(let streamUrl):
-                self?.resolvedUrlCache[videoId] = streamUrl
+                self?.resolvedUrlCache[videoId] = CachedStream(url: streamUrl, timestamp: Date())
                 completion(.success(streamUrl))
             case .failure:
                 self?.resolveViaEmbeddedInnertube(videoId: videoId) { embeddedResult in
                     switch embeddedResult {
                     case .success(let streamUrl):
-                        self?.resolvedUrlCache[videoId] = streamUrl
+                        self?.resolvedUrlCache[videoId] = CachedStream(url: streamUrl, timestamp: Date())
                         completion(.success(streamUrl))
                     case .failure(let err):
                         completion(.failure(err))
