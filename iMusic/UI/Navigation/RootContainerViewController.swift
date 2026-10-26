@@ -4,23 +4,20 @@ final class RootContainerViewController: UIViewController {
 
     private let tabBarVC = MainTabBarController()
     private let miniPlayer = MiniPlayerView()
-    private var miniPlayerBottomConstraint: NSLayoutConstraint?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = AppTheme.background
 
-        // 1. Add Main Tab Bar Controller
         addChild(tabBarVC)
         tabBarVC.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(tabBarVC.view)
         tabBarVC.didMove(toParent: self)
 
-        // 2. Add Floating Mini Player
         miniPlayer.translatesAutoresizingMaskIntoConstraints = false
-        miniPlayer.onTap = { [weak self] in
-            self?.presentNowPlaying()
-        }
+        miniPlayer.onTap = { [weak self] in self?.presentNowPlaying() }
+        miniPlayer.onPlayPause = { AudioPlayer.shared.togglePlayPause() }
+        miniPlayer.onNext = { AudioPlayer.shared.next() }
         view.addSubview(miniPlayer)
 
         NSLayoutConstraint.activate([
@@ -37,8 +34,9 @@ final class RootContainerViewController: UIViewController {
     }
 
     private func presentNowPlaying() {
+        guard presentedViewController == nil, AudioPlayer.shared.currentTrack != nil else { return }
         let nowPlayingVC = NowPlayingViewController()
-        nowPlayingVC.modalPresentationStyle = .overFullScreen
+        nowPlayingVC.modalPresentationStyle = .fullScreen
         nowPlayingVC.modalTransitionStyle = .coverVertical
         present(nowPlayingVC, animated: true, completion: nil)
     }

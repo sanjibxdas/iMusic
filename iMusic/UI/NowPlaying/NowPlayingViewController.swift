@@ -16,6 +16,7 @@ final class NowPlayingViewController: UIViewController {
     // Header
     private let dismissButton = UIButton(type: .custom)
     private let grabberView = UIView()
+    private let playbackStatusLabel = UILabel()
 
     // Center state container
     private let centerContainer = UIView()
@@ -87,23 +88,27 @@ final class NowPlayingViewController: UIViewController {
     private func setupScrollView() {
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = false
+        scrollView.contentInsetAdjustmentBehavior = .never
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
 
         contentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentView)
+        let minimumHeight = contentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor)
+        minimumHeight.priority = UILayoutPriority(250)
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 48),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            minimumHeight
         ])
     }
 
@@ -113,24 +118,37 @@ final class NowPlayingViewController: UIViewController {
         grabberView.backgroundColor = UIColor(white: 0.4, alpha: 0.5)
         grabberView.layer.cornerRadius = 2.5
         grabberView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(grabberView)
+        view.addSubview(grabberView)
 
         dismissButton.setImage(IconFactory.chevronDown(size: 20), for: .normal)
-        dismissButton.tintColor = AppTheme.textSecondary
+        dismissButton.tintColor = AppTheme.textPrimary
+        dismissButton.accessibilityLabel = "Close player"
         dismissButton.translatesAutoresizingMaskIntoConstraints = false
         dismissButton.addTarget(self, action: #selector(dismissAction), for: .touchUpInside)
-        contentView.addSubview(dismissButton)
+        view.addSubview(dismissButton)
+
+        playbackStatusLabel.font = UIFont.systemFont(ofSize: 11, weight: .medium)
+        playbackStatusLabel.textColor = AppTheme.textSecondary
+        playbackStatusLabel.numberOfLines = 2
+        playbackStatusLabel.accessibilityTraits = .updatesFrequently
+        playbackStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(playbackStatusLabel)
+        NSLayoutConstraint.activate([
+            playbackStatusLabel.leadingAnchor.constraint(equalTo: dismissButton.trailingAnchor, constant: 8),
+            playbackStatusLabel.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+            playbackStatusLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 18),
+            playbackStatusLabel.bottomAnchor.constraint(lessThanOrEqualTo: scrollView.topAnchor, constant: -2)
+        ])
 
         NSLayoutConstraint.activate([
-            grabberView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-            grabberView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            grabberView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            grabberView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             grabberView.widthAnchor.constraint(equalToConstant: 36),
             grabberView.heightAnchor.constraint(equalToConstant: 5),
-
-            dismissButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
-            dismissButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            dismissButton.widthAnchor.constraint(equalToConstant: 36),
-            dismissButton.heightAnchor.constraint(equalToConstant: 36)
+            dismissButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            dismissButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 8),
+            dismissButton.widthAnchor.constraint(equalToConstant: 44),
+            dismissButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
 
@@ -193,7 +211,7 @@ final class NowPlayingViewController: UIViewController {
         queueVC.didMove(toParent: self)
 
         NSLayoutConstraint.activate([
-            centerContainer.topAnchor.constraint(equalTo: dismissButton.bottomAnchor, constant: 4),
+            centerContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
             centerContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             centerContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             centerContainer.heightAnchor.constraint(equalToConstant: 250),
@@ -474,6 +492,7 @@ final class NowPlayingViewController: UIViewController {
         compactArtworkView.image = nil
         if !track.artworkUrl.isEmpty {
             ImageLoader.shared.loadImage(from: track.artworkUrl) { [weak self] image in
+                guard AudioPlayer.shared.currentTrack?.id == track.id else { return }
                 self?.artworkView.image = image
                 self?.compactArtworkView.image = image
             }
@@ -485,9 +504,13 @@ final class NowPlayingViewController: UIViewController {
     }
 
     @objc private func updatePlaybackState() {
-        let isPlaying = AudioPlayer.shared.isPlaying
-        let icon = isPlaying ? IconFactory.pause(size: 34) : IconFactory.play(size: 34)
+        let player = AudioPlayer.shared
+        let isPlaying = player.isPlaying
+        let icon = player.isPlaybackRequested ? IconFactory.pause(size: 34) : IconFactory.play(size: 34)
         playPauseButton.setImage(icon, for: .normal)
+        playPauseButton.accessibilityLabel = player.playbackError == nil ? (player.isPlaybackRequested ? "Pause" : "Play") : "Retry playback"
+        playbackStatusLabel.text = player.playbackError.map { "\($0) Tap Play to retry." } ?? (player.isLoading && player.isPlaybackRequested ? "Loading audio…" : nil)
+        playbackStatusLabel.textColor = player.playbackError == nil ? AppTheme.textSecondary : AppTheme.accent
 
         UIView.animate(withDuration: 0.35, delay: 0, options: [.curveEaseOut], animations: {
             if isPlaying {
@@ -549,7 +572,7 @@ final class NowPlayingViewController: UIViewController {
     }
 
     private func formatTime(_ sec: TimeInterval) -> String {
-        guard sec > 0 && !sec.isNaN else { return "0:00" }
+        guard sec.isFinite, sec > 0, sec < Double(Int.max) else { return "0:00" }
         let total = Int(sec)
         let m = total / 60
         let s = total % 60

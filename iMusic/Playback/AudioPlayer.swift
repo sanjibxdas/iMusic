@@ -9,198 +9,178 @@ enum RepeatMode: Int {
 }
 
 final class AudioPlayer: NSObject {
-
     static let shared = AudioPlayer()
-
-    // Notifications
     static let trackDidChange = Notification.Name("AudioPlayerTrackDidChange")
     static let playbackStateDidChange = Notification.Name("AudioPlayerPlaybackStateDidChange")
     static let playbackProgressDidChange = Notification.Name("AudioPlayerPlaybackProgressDidChange")
     static let queueDidChange = Notification.Name("AudioPlayerQueueDidChange")
     static let volumeDidChange = Notification.Name("AudioPlayerVolumeDidChange")
+    static let playbackDidFail = Notification.Name("AudioPlayerPlaybackDidFail")
 
-    // State
-    private(set) var queue: [Track] = []
-    private(set) var currentIndex: Int = -1
-    private(set) var isPlaying: Bool = false
+    private struct Entry {
+        let id = UUID()
+        let track: Track
+    }
+
+    private var entries: [Entry] = []
+    private var originalEntries: [Entry] = []
+    var queue: [Track] { return entries.map { $0.track } }
+    private(set) var currentIndex = -1
+    private(set) var isPlaying = false
+    private(set) var isLoading = false
+    private(set) var playbackError: String?
     private(set) var repeatMode: RepeatMode = .off
-    private(set) var isShuffled: Bool = false
-    private var originalQueue: [Track] = []
+    private(set) var isShuffled = false
+    private var wantsPlayback = false
+    var isPlaybackRequested: Bool { return wantsPlayback }
+    private var resumeAfterInterruption = false
+    private var generation = UUID()
+    private var recordedGeneration: UUID?
+    private var retriedGeneration: UUID?
+    private let player = AVPlayer()
+    private var itemObservation: NSKeyValueObservation?
+    private var playbackObservation: NSKeyValueObservation?
+    private var timeObserver: Any?
+    private var currentArtworkImage: UIImage?
 
     var volume: Float {
-        get {
-            return player?.volume ?? SettingsManager.shared.softwareVolume
-        }
+        get { return player.volume }
         set {
-            let clamped = max(0.0, min(1.0, newValue))
-            player?.volume = clamped
-            SettingsManager.shared.softwareVolume = clamped
+            guard newValue.isFinite else { return }
+            player.volume = max(0, min(1, newValue))
+            SettingsManager.shared.softwareVolume = player.volume
             NotificationCenter.default.post(name: AudioPlayer.volumeDidChange, object: nil)
         }
     }
 
     var currentTrack: Track? {
-        guard currentIndex >= 0 && currentIndex < queue.count else { return nil }
-        return queue[currentIndex]
+        guard entries.indices.contains(currentIndex) else { return nil }
+        return entries[currentIndex].track
     }
 
     var currentTime: TimeInterval {
-        guard let item = player?.currentItem else { return 0 }
-        let sec = CMTimeGetSeconds(item.currentTime())
-        return sec.isNaN ? 0 : sec
+        let seconds = CMTimeGetSeconds(player.currentTime())
+        return seconds.isFinite && seconds >= 0 ? seconds : 0
+    }
+
+    /// Highlighted queue row, including while a stream is still resolving.
+    var highlightedIndex: Int {
+        return entries.indices.contains(currentIndex) ? currentIndex : -1
     }
 
     var duration: TimeInterval {
-        guard let item = player?.currentItem else { return currentTrack?.duration ?? 0 }
-        let sec = CMTimeGetSeconds(item.duration)
-        if sec.isNaN || sec <= 0 {
-            return currentTrack?.duration ?? 0
-        }
-        return sec
+        let seconds = player.currentItem.map { CMTimeGetSeconds($0.duration) } ?? 0
+        if seconds.isFinite && seconds > 0 { return seconds }
+        let fallback = currentTrack?.duration ?? 0
+        return fallback.isFinite && fallback > 0 ? fallback : 0
     }
 
-    // Audio engine
-    private var player: AVPlayer?
-    private var timeObserver: Any?
-    private var currentArtworkImage: UIImage?
-
-    override private init() {
+    private override init() {
         super.init()
-        setupAudioSession()
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+        } catch {
+            playbackError = error.localizedDescription
+        }
+        player.volume = SettingsManager.shared.softwareVolume
+        player.automaticallyWaitsToMinimizeStalling = true
+        player.actionAtItemEnd = .pause
+        playbackObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.refreshPlaybackState() }
+        }
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 4), queue: .main) { _ in
+            NotificationCenter.default.post(name: AudioPlayer.playbackProgressDidChange, object: nil)
+        }
+        NotificationCenter.default.addObserver(self, selector: #selector(handleAudioInterruption(_:)), name: AVAudioSession.interruptionNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleRouteChange(_:)), name: AVAudioSession.routeChangeNotification, object: nil)
         NowPlayingCenter.shared.setupRemoteCommands(player: self)
     }
 
-    private func setupAudioSession() {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
-        } catch {
-            print("Failed to configure AVAudioSession: \(error)")
-        }
-
-        NotificationCenter.default.addObserver(self, selector: #selector(handleAudioInterruption(_:)), name: AVAudioSession.interruptionNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(handleRouteChange(_:)), name: AVAudioSession.routeChangeNotification, object: nil)
-    }
-
-    @objc private func handleAudioInterruption(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
-        if type == .began {
-            pause()
-        } else if type == .ended {
-            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
-                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                if options.contains(.shouldResume) {
-                    resume()
-                }
-            }
-        }
-    }
-
-    @objc private func handleRouteChange(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
-              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
-        // Pause audio when headphones/AirPods are disconnected
-        if reason == .oldDeviceUnavailable {
-            pause()
-        }
-    }
-
-    // MARK: - Queue & Playback Control
-
     func play(_ tracks: [Track], startingAt index: Int = 0) {
-        guard !tracks.isEmpty, index >= 0 && index < tracks.count else { return }
-
-        self.originalQueue = tracks
-        self.queue = tracks
-        self.currentIndex = index
-        self.isShuffled = false
-
-        NotificationCenter.default.post(name: AudioPlayer.queueDidChange, object: nil)
+        guard tracks.indices.contains(index) else { return }
+        entries = tracks.map { Entry(track: $0) }
+        originalEntries = entries
+        currentIndex = index
+        isShuffled = false
+        notifyQueue()
         loadCurrentTrackAndPlay()
     }
 
     func playNext(_ track: Track) {
-        let insertIndex = currentIndex + 1
-        if insertIndex <= queue.count {
-            queue.insert(track, at: insertIndex)
+        let entry = Entry(track: track)
+        let insertion = max(0, min(currentIndex + 1, entries.count))
+        if entries.indices.contains(currentIndex), let originalIndex = originalEntries.firstIndex(where: { $0.id == entries[currentIndex].id }) {
+            originalEntries.insert(entry, at: originalIndex + 1)
         } else {
-            queue.append(track)
+            originalEntries.append(entry)
         }
-        NotificationCenter.default.post(name: AudioPlayer.queueDidChange, object: nil)
+        entries.insert(entry, at: insertion)
+        notifyQueue()
     }
 
     func addToQueue(_ track: Track) {
-        queue.append(track)
-        NotificationCenter.default.post(name: AudioPlayer.queueDidChange, object: nil)
+        let entry = Entry(track: track)
+        entries.append(entry)
+        originalEntries.append(entry)
+        notifyQueue()
     }
 
     func removeTrack(at index: Int) {
-        guard index >= 0 && index < queue.count else { return }
-        queue.remove(at: index)
-        if index < currentIndex {
-            currentIndex -= 1
+        guard entries.indices.contains(index) else { return }
+        let removingCurrent = index == currentIndex
+        let removed = entries.remove(at: index)
+        originalEntries.removeAll { $0.id == removed.id }
+        if entries.isEmpty {
+            currentIndex = -1
+            resetPlayback()
+            notifyQueue()
+            NotificationCenter.default.post(name: AudioPlayer.trackDidChange, object: nil)
+            return
         }
-        NotificationCenter.default.post(name: AudioPlayer.queueDidChange, object: nil)
+        if index < currentIndex { currentIndex -= 1 }
+        if removingCurrent { currentIndex = min(index, entries.count - 1) }
+        notifyQueue()
+        if removingCurrent { loadCurrentTrackAndPlay() }
     }
 
     func moveTrack(from sourceIndex: Int, to destinationIndex: Int) {
-        guard sourceIndex >= 0 && sourceIndex < queue.count,
-              destinationIndex >= 0 && destinationIndex < queue.count else { return }
-        let moved = queue.remove(at: sourceIndex)
-        queue.insert(moved, at: destinationIndex)
-
-        if sourceIndex == currentIndex {
-            currentIndex = destinationIndex
-        } else if sourceIndex < currentIndex && destinationIndex >= currentIndex {
-            currentIndex -= 1
-        } else if sourceIndex > currentIndex && destinationIndex <= currentIndex {
-            currentIndex += 1
-        }
-        NotificationCenter.default.post(name: AudioPlayer.queueDidChange, object: nil)
+        guard entries.indices.contains(sourceIndex), entries.indices.contains(destinationIndex) else { return }
+        let currentID = entries.indices.contains(currentIndex) ? entries[currentIndex].id : nil
+        let entry = entries.remove(at: sourceIndex)
+        entries.insert(entry, at: destinationIndex)
+        currentIndex = currentID.flatMap { id in entries.firstIndex { $0.id == id } } ?? -1
+        if !isShuffled { originalEntries = entries }
+        notifyQueue()
     }
 
-    // MARK: - Transport
-
     func togglePlayPause() {
-        if isPlaying {
-            pause()
-        } else {
-            resume()
-        }
+        if wantsPlayback { pause() } else { resume() }
     }
 
     func pause() {
-        player?.pause()
-        isPlaying = false
-        updateNowPlaying()
-        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
+        wantsPlayback = false
+        resumeAfterInterruption = false
+        player.pause()
+        refreshPlaybackState()
     }
 
     func resume() {
-        guard let p = player else {
+        guard currentTrack != nil else { return }
+        wantsPlayback = true
+        if playbackError != nil || (player.currentItem == nil && !isLoading) {
             loadCurrentTrackAndPlay()
             return
         }
-        p.play()
-        isPlaying = true
-        updateNowPlaying()
-        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
+        if let item = player.currentItem, item.status == .readyToPlay {
+            activateAndPlay()
+        } else {
+            refreshPlaybackState()
+        }
     }
 
     func next() {
-        guard !queue.isEmpty else { return }
-
-        if repeatMode == .one {
-            seek(to: 0)
-            resume()
-            return
-        }
-
-        if currentIndex + 1 < queue.count {
+        guard !entries.isEmpty else { return }
+        if currentIndex + 1 < entries.count {
             currentIndex += 1
             loadCurrentTrackAndPlay()
         } else if repeatMode == .all {
@@ -208,18 +188,12 @@ final class AudioPlayer: NSObject {
             loadCurrentTrackAndPlay()
         } else {
             pause()
-            seek(to: 0)
         }
     }
 
     func previous() {
-        guard !queue.isEmpty else { return }
-
-        if currentTime > 3.0 {
-            seek(to: 0)
-            return
-        }
-
+        guard currentTrack != nil else { return }
+        if currentTime > 3 { seek(to: 0); return }
         if currentIndex > 0 {
             currentIndex -= 1
             loadCurrentTrackAndPlay()
@@ -229,163 +203,224 @@ final class AudioPlayer: NSObject {
     }
 
     func seek(to time: TimeInterval) {
-        guard let p = player else { return }
-        let target = CMTime(seconds: time, preferredTimescale: 600)
-        p.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
-            self?.updateNowPlaying()
-            NotificationCenter.default.post(name: AudioPlayer.playbackProgressDidChange, object: nil)
+        guard time.isFinite, player.currentItem != nil else { return }
+        let token = generation
+        let target = max(0, duration > 0 ? min(time, duration) : time)
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self = self, self.generation == token else { return }
+                self.updateNowPlaying()
+                NotificationCenter.default.post(name: AudioPlayer.playbackProgressDidChange, object: nil)
+            }
         }
     }
 
     func toggleShuffle() {
-        guard !queue.isEmpty else { return }
+        guard entries.indices.contains(currentIndex) else { return }
+        let current = entries[currentIndex]
         isShuffled.toggle()
-
         if isShuffled {
-            guard let cur = currentTrack else { return }
-            var remaining = queue
+            originalEntries = entries
+            var remaining = entries
             remaining.remove(at: currentIndex)
             remaining.shuffle()
-            queue = [cur] + remaining
-            currentIndex = 0
+            entries = [current] + remaining
         } else {
-            guard let cur = currentTrack else { return }
-            queue = originalQueue
-            if let idx = queue.firstIndex(where: { $0.id == cur.id }) {
-                currentIndex = idx
-            }
+            entries = originalEntries
         }
-        NotificationCenter.default.post(name: AudioPlayer.queueDidChange, object: nil)
+        currentIndex = entries.firstIndex { $0.id == current.id } ?? -1
+        notifyQueue()
+        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
     }
 
     func cycleRepeatMode() {
-        let nextRaw = (repeatMode.rawValue + 1) % 3
-        repeatMode = RepeatMode(rawValue: nextRaw) ?? .off
+        repeatMode = RepeatMode(rawValue: (repeatMode.rawValue + 1) % 3) ?? .off
         NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
     }
 
-    // MARK: - Internal Stream Loading & Playback
+    /// Resolves the stream for an upcoming queue entry so playback can start immediately.
+    func prewarm(at index: Int) {
+        guard entries.indices.contains(index) else { return }
+        StreamResolver.shared.resolveStreamURL(for: entries[index].track) { _ in }
+    }
+
+    private func resetPlayback() {
+        generation = UUID()
+        itemObservation = nil
+        retriedGeneration = nil
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: nil)
+        wantsPlayback = false
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        isLoading = false
+        isPlaying = false
+        playbackError = nil
+        currentArtworkImage = nil
+        refreshPlaybackState()
+    }
 
     private func loadCurrentTrackAndPlay() {
         guard let track = currentTrack else { return }
-
-        // Immediately pause current playback so old audio doesn't bleed during resolution
-        player?.pause()
-        isPlaying = false
-        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
-
-        StorageManager.shared.recordHistory(track: track)
+        resetPlayback()
+        let token = generation
+        wantsPlayback = true
+        isLoading = true
+        updateNowPlaying()
         NotificationCenter.default.post(name: AudioPlayer.trackDidChange, object: nil)
-
-        currentArtworkImage = nil
+        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
         if !track.artworkUrl.isEmpty {
             ImageLoader.shared.loadImage(from: track.artworkUrl) { [weak self] image in
-                self?.currentArtworkImage = image
-                self?.updateNowPlaying()
+                DispatchQueue.main.async {
+                    guard let self = self, self.generation == token else { return }
+                    self.currentArtworkImage = image
+                    self.updateNowPlaying()
+                }
             }
         }
-
-        // 1. Check local download first for instant 0ms playback
-        let localFile = DownloadManager.shared.localAudioURL(for: track.id)
-        if FileManager.default.fileExists(atPath: localFile.path) {
-            startPlayback(url: localFile)
-            prewarmNextTrack()
-            return
-        }
-
-        // 2. If stream URL is already known
-        if let streamUrlStr = track.streamUrl, let streamUrl = URL(string: streamUrlStr) {
-            startPlayback(url: streamUrl)
-            prewarmNextTrack()
-            return
-        }
-
-        // 3. Resolve stream URL
         StreamResolver.shared.resolveStreamURL(for: track) { [weak self] result in
             DispatchQueue.main.async {
-                guard let self = self, self.currentTrack?.id == track.id else { return }
+                guard let self = self, self.generation == token else { return }
                 switch result {
-                case .success(let streamURL):
-                    self.startPlayback(url: streamURL)
-                    self.prewarmNextTrack()
-                case .failure(let error):
-                    print("Stream resolve failed for \(track.title): \(error)")
-                    self.isPlaying = false
-                    NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
+                case .success(let url): self.installItem(url: url, token: token)
+                case .failure(let error): self.fail(error.localizedDescription)
                 }
             }
         }
     }
 
-    private func startPlayback(url: URL) {
-        removeTimeObserver()
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
-
+    private func installItem(url: URL, token: UUID) {
         let item = AVPlayerItem(url: url)
-        // High responsiveness on iOS 12: low forward buffer prevents 10s stalling
-        item.preferredForwardBufferDuration = 3.0
-
-        if player == nil {
-            player = AVPlayer(playerItem: item)
-        } else {
-            player?.replaceCurrentItem(with: item)
+        item.preferredForwardBufferDuration = 2
+        player.replaceCurrentItem(with: item)
+        NotificationCenter.default.addObserver(self, selector: #selector(playerItemDidReachEnd(_:)), name: .AVPlayerItemDidPlayToEndTime, object: item)
+        NotificationCenter.default.addObserver(self, selector: #selector(playerItemDidFail(_:)), name: .AVPlayerItemFailedToPlayToEndTime, object: item)
+        itemObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] observedItem, _ in
+            DispatchQueue.main.async {
+                guard let self = self, self.generation == token, self.player.currentItem === observedItem else { return }
+                switch observedItem.status {
+                case .readyToPlay:
+                    self.isLoading = false
+                    if self.wantsPlayback { self.activateAndPlay() }
+                    self.refreshPlaybackState()
+                case .failed:
+                    if self.retryAfterItemFailure(token: token, message: observedItem.error?.localizedDescription) {
+                        return
+                    }
+                    self.fail(observedItem.error?.localizedDescription ?? "This audio stream could not be played. Please retry.")
+                case .unknown: break
+                @unknown default: break
+                }
+            }
         }
+    }
 
-        // Disable waiting for full buffer so playback begins instantly!
-        player?.automaticallyWaitsToMinimizeStalling = false
-        player?.volume = SettingsManager.shared.softwareVolume
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(playerItemDidReachEnd),
-            name: .AVPlayerItemDidPlayToEndTime,
-            object: item
-        )
-
-        let interval = CMTime(value: 1, timescale: 4)
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { _ in
-            NotificationCenter.default.post(name: AudioPlayer.playbackProgressDidChange, object: nil)
+    private func activateAndPlay() {
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            player.play()
+        } catch {
+            fail(error.localizedDescription)
         }
+    }
 
-        player?.play()
-        isPlaying = true
+    private func refreshPlaybackState() {
+        isPlaying = wantsPlayback && player.timeControlStatus == .playing
+        if player.currentItem?.status == .readyToPlay {
+            isLoading = wantsPlayback && player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+        }
+        if isPlaying, recordedGeneration != generation, let track = currentTrack {
+            recordedGeneration = generation
+            StorageManager.shared.recordHistory(track: track)
+            let nextIndex = currentIndex + 1 < entries.count ? currentIndex + 1 : (repeatMode == .all ? 0 : -1)
+            prewarm(at: nextIndex)
+        }
         updateNowPlaying()
         NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
     }
 
-    private func prewarmNextTrack() {
-        guard currentIndex + 1 < queue.count else { return }
-        let nextTrack = queue[currentIndex + 1]
-        StreamResolver.shared.resolveStreamURL(for: nextTrack) { _ in }
+    private func fail(_ message: String) {
+        wantsPlayback = false
+        player.pause()
+        isLoading = false
+        isPlaying = false
+        playbackError = message
+        updateNowPlaying()
+        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
+        NotificationCenter.default.post(name: AudioPlayer.playbackDidFail, object: nil, userInfo: ["message": message])
     }
 
-    @objc private func playerItemDidReachEnd() {
-        next()
+    @objc private func playerItemDidReachEnd(_ notification: Notification) {
+        guard let item = notification.object as? AVPlayerItem, player.currentItem === item else { return }
+        if repeatMode == .one { seek(to: 0); resume() } else { next() }
     }
 
-    private func removeTimeObserver() {
-        if let observer = timeObserver {
-            player?.removeTimeObserver(observer)
-            timeObserver = nil
+    @objc private func playerItemDidFail(_ notification: Notification) {
+        guard let item = notification.object as? AVPlayerItem, player.currentItem === item else { return }
+        let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+        if retryAfterItemFailure(token: generation, message: error?.localizedDescription) { return }
+        fail(error?.localizedDescription ?? "Playback stopped because the audio stream failed.")
+    }
+
+    /// Retries a track once with a freshly resolved stream (stale/403 CDN URLs are common).
+    private func retryAfterItemFailure(token: UUID, message: String?) -> Bool {
+        guard generation == token, retriedGeneration != token, let track = currentTrack, wantsPlayback else { return false }
+        retriedGeneration = token
+        StreamResolver.shared.invalidate(trackId: track.id)
+        let retryToken = UUID()
+        generation = retryToken
+        itemObservation = nil
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        isLoading = true
+        playbackError = nil
+        NotificationCenter.default.post(name: AudioPlayer.playbackStateDidChange, object: nil)
+        StreamResolver.shared.resolveStreamURL(for: track) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self, self.generation == retryToken, self.wantsPlayback else { return }
+                switch result {
+                case .success(let url): self.installItem(url: url, token: retryToken)
+                case .failure(let error): self.fail(error.localizedDescription)
+                }
+            }
         }
+        return true
+    }
+
+    @objc private func handleAudioInterruption(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let value = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: value) else { return }
+            if type == .began {
+                let shouldResume = self.wantsPlayback
+                self.pause()
+                self.resumeAfterInterruption = shouldResume
+            } else {
+                let value = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+                let shouldResume = self.resumeAfterInterruption && AVAudioSession.InterruptionOptions(rawValue: value).contains(.shouldResume)
+                self.resumeAfterInterruption = false
+                if shouldResume { self.resume() }
+            }
+        }
+    }
+
+    @objc private func handleRouteChange(_ notification: Notification) {
+        guard let value = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              AVAudioSession.RouteChangeReason(rawValue: value) == .oldDeviceUnavailable else { return }
+        DispatchQueue.main.async { [weak self] in self?.pause() }
+    }
+
+    private func notifyQueue() {
+        NotificationCenter.default.post(name: AudioPlayer.queueDidChange, object: nil)
     }
 
     private func updateNowPlaying() {
-        guard let track = currentTrack else {
-            NowPlayingCenter.shared.clear()
-            return
-        }
-        NowPlayingCenter.shared.update(
-            track: track,
-            currentTime: currentTime,
-            duration: duration,
-            isPlaying: isPlaying,
-            artworkImage: currentArtworkImage
-        )
+        guard let track = currentTrack else { NowPlayingCenter.shared.clear(); return }
+        NowPlayingCenter.shared.update(track: track, currentTime: currentTime, duration: duration, isPlaying: isPlaying, artworkImage: currentArtworkImage)
     }
 
     deinit {
-        removeTimeObserver()
+        if let observer = timeObserver { player.removeTimeObserver(observer) }
         NotificationCenter.default.removeObserver(self)
     }
 }

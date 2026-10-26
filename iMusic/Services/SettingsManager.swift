@@ -1,15 +1,13 @@
 import Foundation
 
 enum DownloadQuality: String, Codable, CaseIterable {
-    case standard = "Standard (128 kbps)"
-    case high = "High (256 kbps)"
-    case lossless = "Lossless (Hi-Fi)"
+    case standard = "Standard AAC (about 48 kbps, when available)"
+    case high = "High AAC (about 128 kbps, when available)"
 
     var itag: Int {
         switch self {
-        case .standard: return 139 // 64-128k
-        case .high: return 140     // 128-256k
-        case .lossless: return 141 // 256k+
+        case .standard: return 139
+        case .high: return 140
         }
     }
 }
@@ -40,11 +38,11 @@ final class SettingsManager {
 
     var downloadQuality: DownloadQuality {
         get {
-            guard let raw = defaults.string(forKey: keyDownloadQuality),
-                  let val = DownloadQuality(rawValue: raw) else {
-                return .high
-            }
-            return val
+            guard let raw = defaults.string(forKey: keyDownloadQuality) else { return .high }
+            if let value = DownloadQuality(rawValue: raw) { return value }
+            let migrated: DownloadQuality = raw == "Standard (128 kbps)" ? .standard : .high
+            defaults.set(migrated.rawValue, forKey: keyDownloadQuality)
+            return migrated
         }
         set {
             defaults.set(newValue.rawValue, forKey: keyDownloadQuality)

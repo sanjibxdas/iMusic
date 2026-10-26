@@ -1,8 +1,10 @@
 import UIKit
 
-final class MiniPlayerView: UIView {
+final class MiniPlayerView: UIView, UIGestureRecognizerDelegate {
 
     var onTap: (() -> Void)?
+    var onNext: (() -> Void)?
+    var onPlayPause: (() -> Void)?
 
     private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let artworkView = UIImageView()
@@ -100,21 +102,23 @@ final class MiniPlayerView: UIView {
 
             nextButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
             nextButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            nextButton.widthAnchor.constraint(equalToConstant: 36),
-            nextButton.heightAnchor.constraint(equalToConstant: 36),
+            nextButton.widthAnchor.constraint(equalToConstant: 44),
+            nextButton.heightAnchor.constraint(equalToConstant: 44),
 
-            playPauseButton.trailingAnchor.constraint(equalTo: nextButton.leadingAnchor, constant: -8),
+            playPauseButton.trailingAnchor.constraint(equalTo: nextButton.leadingAnchor, constant: -4),
             playPauseButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-            playPauseButton.widthAnchor.constraint(equalToConstant: 36),
-            playPauseButton.heightAnchor.constraint(equalToConstant: 36)
+            playPauseButton.widthAnchor.constraint(equalToConstant: 44),
+            playPauseButton.heightAnchor.constraint(equalToConstant: 44)
         ])
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         tap.cancelsTouchesInView = false
+        tap.delegate = self
         addGestureRecognizer(tap)
 
         let swipeUp = UISwipeGestureRecognizer(target: self, action: #selector(handleTap))
         swipeUp.direction = .up
+        swipeUp.delegate = self
         addGestureRecognizer(swipeUp)
     }
 
@@ -133,14 +137,17 @@ final class MiniPlayerView: UIView {
 
         isHidden = false
         titleLabel.text = track.title
-        artistLabel.text = track.artist.isEmpty ? "Unknown Artist" : track.artist
+        artistLabel.text = player.playbackError.map { _ in "Playback failed — tap Play to retry" } ?? (player.isLoading && player.isPlaybackRequested ? "Loading audio…" : (track.artist.isEmpty ? "Unknown Artist" : track.artist))
+        playPauseButton.accessibilityLabel = player.isPlaybackRequested ? "Pause" : "Play"
+        nextButton.accessibilityLabel = "Next track"
 
-        let icon = player.isPlaying ? IconFactory.pause(size: 20) : IconFactory.play(size: 20)
+        let icon = player.isPlaybackRequested ? IconFactory.pause(size: 20) : IconFactory.play(size: 20)
         playPauseButton.setImage(icon, for: .normal)
 
         artworkView.image = nil
         if !track.artworkUrl.isEmpty {
             ImageLoader.shared.loadImage(from: track.artworkUrl) { [weak self] image in
+                guard AudioPlayer.shared.currentTrack?.id == track.id else { return }
                 self?.artworkView.image = image
             }
         }
@@ -158,11 +165,20 @@ final class MiniPlayerView: UIView {
     }
 
     @objc private func playPauseTapped() {
-        AudioPlayer.shared.togglePlayPause()
+        if let onPlayPause = onPlayPause { onPlayPause() } else { AudioPlayer.shared.togglePlayPause() }
     }
 
     @objc private func nextTapped() {
-        AudioPlayer.shared.next()
+        if let onNext = onNext { onNext() } else { AudioPlayer.shared.next() }
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        var touchedView = touch.view
+        while let candidate = touchedView, candidate !== self {
+            if candidate is UIControl { return false }
+            touchedView = candidate.superview
+        }
+        return true
     }
 
     @objc private func handleTap() {

@@ -3,49 +3,47 @@ import MediaPlayer
 import UIKit
 
 final class NowPlayingCenter {
-
     static let shared = NowPlayingCenter()
-
     private let infoCenter = MPNowPlayingInfoCenter.default()
     private let commandCenter = MPRemoteCommandCenter.shared()
+    private var commandsInstalled = false
+    private var artworkImage: UIImage?
+    private var artwork: MPMediaItemArtwork?
 
     private init() {}
 
     func setupRemoteCommands(player: AudioPlayer) {
+        guard !commandsInstalled else { return }
+        commandsInstalled = true
         commandCenter.playCommand.isEnabled = true
         commandCenter.playCommand.addTarget { [weak player] _ in
-            player?.resume()
+            DispatchQueue.main.async { player?.resume() }
             return .success
         }
-
         commandCenter.pauseCommand.isEnabled = true
         commandCenter.pauseCommand.addTarget { [weak player] _ in
-            player?.pause()
+            DispatchQueue.main.async { player?.pause() }
             return .success
         }
-
         commandCenter.togglePlayPauseCommand.isEnabled = true
         commandCenter.togglePlayPauseCommand.addTarget { [weak player] _ in
-            player?.togglePlayPause()
+            DispatchQueue.main.async { player?.togglePlayPause() }
             return .success
         }
-
         commandCenter.nextTrackCommand.isEnabled = true
         commandCenter.nextTrackCommand.addTarget { [weak player] _ in
-            player?.next()
+            DispatchQueue.main.async { player?.next() }
             return .success
         }
-
         commandCenter.previousTrackCommand.isEnabled = true
         commandCenter.previousTrackCommand.addTarget { [weak player] _ in
-            player?.previous()
+            DispatchQueue.main.async { player?.previous() }
             return .success
         }
-
         commandCenter.changePlaybackPositionCommand.isEnabled = true
         commandCenter.changePlaybackPositionCommand.addTarget { [weak player] event in
-            guard let posEvent = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            player?.seek(to: posEvent.positionTime)
+            guard let position = (event as? MPChangePlaybackPositionCommandEvent)?.positionTime, position.isFinite else { return .commandFailed }
+            DispatchQueue.main.async { player?.seek(to: position) }
             return .success
         }
     }
@@ -55,23 +53,21 @@ final class NowPlayingCenter {
             MPMediaItemPropertyTitle: track.title,
             MPMediaItemPropertyArtist: track.artist,
             MPMediaItemPropertyAlbumTitle: track.album,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime.isFinite ? max(0, currentTime) : 0,
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0
         ]
-
-        if duration > 0 {
-            info[MPMediaItemPropertyPlaybackDuration] = duration
+        if duration.isFinite && duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
+        if self.artworkImage !== artworkImage {
+            self.artworkImage = artworkImage
+            artwork = artworkImage.map { image in MPMediaItemArtwork(boundsSize: image.size) { _ in image } }
         }
-
-        if let image = artworkImage {
-            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-            info[MPMediaItemPropertyArtwork] = artwork
-        }
-
+        if let artwork = artwork { info[MPMediaItemPropertyArtwork] = artwork }
         infoCenter.nowPlayingInfo = info
     }
 
     func clear() {
         infoCenter.nowPlayingInfo = nil
+        artworkImage = nil
+        artwork = nil
     }
 }

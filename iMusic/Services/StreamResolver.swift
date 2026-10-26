@@ -1,225 +1,123 @@
 import Foundation
 
-private struct CachedStream {
-    let url: URL
-    let timestamp: Date
-    var isExpired: Bool {
-        return Date().timeIntervalSince(timestamp) > (3 * 3600)
-    }
-}
-
 final class StreamResolver {
-
     static let shared = StreamResolver()
 
-    private let session: URLSession
-    private var resolvedUrlCache: [String: CachedStream] = [:]
+    private struct CachedStream {
+        let url: URL
+        let expires: Date
+    }
 
-    // Invidious instances with local proxy enabled (?local=true)
-    private let invidiousInstances = [
-        "https://yt.chocolatemoo53.com",
-        "https://iv.ggtyler.dev",
-        "https://inv.vern.cc"
-    ]
+    private let state = DispatchQueue(label: "iMusic.resolver")
+    private var cache: [String: CachedStream] = [:]
+    private var pending: [String: [(Result<URL, Error>) -> Void]] = [:]
+    private let session: URLSession
+    private let base = URL(string: "https://yt.chocolatemoo53.com")!
 
     private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 6
-        config.timeoutIntervalForResource = 15
-        self.session = URLSession(configuration: config)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 5
+        configuration.timeoutIntervalForResource = 8
+        configuration.httpMaximumConnectionsPerHost = 3
+        session = URLSession(configuration: configuration)
+    }
+
+    func invalidate(trackId: String) {
+        state.async { self.cache.removeAll() }
     }
 
     func resolveStreamURL(for track: Track, completion: @escaping (Result<URL, Error>) -> Void) {
-        // 1. Check local download on disk first (0ms latency!)
-        let localFile = DownloadManager.shared.localAudioURL(for: track.id)
-        if FileManager.default.fileExists(atPath: localFile.path) {
-            completion(.success(localFile))
+        let local = DownloadManager.shared.localAudioURL(for: track.id)
+        if FileManager.default.fileExists(atPath: local.path) {
+            DispatchQueue.main.async { completion(.success(local)) }
             return
         }
-
-        // 2. Check in-memory stream URL cache (with TTL check)
-        if let cached = resolvedUrlCache[track.id], !cached.isExpired {
-            completion(.success(cached.url))
+        if let value = track.streamUrl, let url = URL(string: value), url.isFileURL,
+           FileManager.default.fileExists(atPath: url.path) {
+            DispatchQueue.main.async { completion(.success(url)) }
             return
         }
+        resolve(track: track, itag: 140, completion: completion)
+    }
 
-        // 3. Check if track already has a playable URL
-        if let direct = track.streamUrl, let url = URL(string: direct) {
-            resolvedUrlCache[track.id] = CachedStream(url: url, timestamp: Date())
-            completion(.success(url))
-            return
-        }
-
-        // 4. If ID is an iTunes placeholder ("itunes_..."), search YouTube for the real video ID
-        if track.id.hasPrefix("itunes_") {
-            let query = "\(track.title) \(track.artist)"
-            MusicAPIService.shared.search(query: query) { [weak self] searchResult in
-                switch searchResult {
-                case .success(let tracks) where !tracks.isEmpty:
-                    if let realId = tracks.first(where: { !$0.id.hasPrefix("itunes_") })?.id {
-                        self?.resolveDirectYouTubeId(realId, completion: completion)
-                        return
-                    }
-                    fallthrough
-                default:
-                    completion(.failure(NSError(domain: "StreamResolver", code: -404, userInfo: [NSLocalizedDescriptionKey: "Could not find stream for song"])))
-                }
-            }
-            return
-        }
-
-        // 5. Direct YouTube ID resolution
-        resolveDirectYouTubeId(track.id, completion: completion)
+    func resolveDownloadURL(for track: Track, completion: @escaping (Result<URL, Error>) -> Void) {
+        resolve(track: track, itag: SettingsManager.shared.downloadQuality.itag, completion: completion)
     }
 
     func resolveDirectYouTubeId(_ videoId: String, completion: @escaping (Result<URL, Error>) -> Void) {
-        if let cached = resolvedUrlCache[videoId], !cached.isExpired {
-            completion(.success(cached.url))
+        resolve(track: Track(id: videoId, title: "", artist: ""), itag: 140, completion: completion)
+    }
+
+    private func resolve(track: Track, itag: Int, completion: @escaping (Result<URL, Error>) -> Void) {
+        if track.id.hasPrefix("itunes_") {
+            DispatchQueue.main.async {
+                completion(.failure(self.failure("This result has no verified YouTube track. Search by song and artist instead.")))
+            }
             return
         }
-
-        resolveViaInvidious(videoId: videoId, instanceIndex: 0) { [weak self] result in
-            switch result {
-            case .success(let streamUrl):
-                self?.resolvedUrlCache[videoId] = CachedStream(url: streamUrl, timestamp: Date())
-                completion(.success(streamUrl))
-            case .failure:
-                self?.resolveViaEmbeddedInnertube(videoId: videoId) { embeddedResult in
-                    switch embeddedResult {
-                    case .success(let streamUrl):
-                        self?.resolvedUrlCache[videoId] = CachedStream(url: streamUrl, timestamp: Date())
-                        completion(.success(streamUrl))
-                    case .failure(let err):
-                        completion(.failure(err))
+        guard track.id.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil else {
+            DispatchQueue.main.async { completion(.failure(self.failure("This item is not a playable song."))) }
+            return
+        }
+        let key = "\(track.id):\(itag)"
+        state.async {
+            if let entry = self.cache[key], entry.expires.timeIntervalSinceNow > 60 {
+                DispatchQueue.main.async { completion(.success(entry.url)) }
+                return
+            }
+            if self.pending[key] != nil {
+                self.pending[key]?.append(completion)
+                return
+            }
+            self.pending[key] = [completion]
+            var components = URLComponents(url: self.base.appendingPathComponent("api/v1/videos/\(track.id)"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [URLQueryItem(name: "local", value: "true")]
+            var request = URLRequest(url: components.url!)
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            let started = Date()
+            self.session.dataTask(with: request) { data, response, error in
+                let result: Result<URL, Error>
+                if let error = error {
+                    result = .failure(error)
+                } else if let http = response as? HTTPURLResponse, http.statusCode == 200,
+                          let data = data,
+                          let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                          let formats = json["adaptiveFormats"] as? [[String: Any]] {
+                    let aac = formats.filter { format in
+                        let mime = (format["type"] as? String ?? "").lowercased()
+                        return mime.hasPrefix("audio/mp4") && (format["url"] as? String) != nil
                     }
+                    let selected = aac.first { String(describing: $0["itag"] ?? "") == String(itag) } ?? aac.first
+                    if let value = selected?["url"] as? String, let url = URL(string: value),
+                       url.scheme == "https", url.host == self.base.host {
+                        result = .success(url)
+                    } else {
+                        result = .failure(self.failure("The streaming service did not provide a compatible proxied AAC stream."))
+                    }
+                } else {
+                    result = .failure(self.failure("The streaming service is unavailable. Please retry."))
                 }
-            }
+                print("Stream metadata: \(Int(Date().timeIntervalSince(started) * 1000)) ms")
+                self.finish(key: key, result: result)
+            }.resume()
         }
     }
 
-    // MARK: - Invidious API with Local Proxy (?local=true)
-
-    private func resolveViaInvidious(videoId: String, instanceIndex: Int, completion: @escaping (Result<URL, Error>) -> Void) {
-        guard instanceIndex < invidiousInstances.count else {
-            completion(.failure(NSError(domain: "StreamResolver", code: -1, userInfo: [NSLocalizedDescriptionKey: "All streaming proxies failed"])))
-            return
+    private func finish(key: String, result: Result<URL, Error>) {
+        state.async {
+            if case .success(let url) = result {
+                let expiry = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                    .first(where: { $0.name == "expire" })?.value.flatMap(Double.init)
+                let deadline = min(expiry ?? Date().addingTimeInterval(900).timeIntervalSince1970, Date().addingTimeInterval(900).timeIntervalSince1970)
+                if self.cache.count >= 40 { self.cache.removeAll() }
+                self.cache[key] = CachedStream(url: url, expires: Date(timeIntervalSince1970: deadline))
+            }
+            let callbacks = self.pending.removeValue(forKey: key) ?? []
+            DispatchQueue.main.async { callbacks.forEach { $0(result) } }
         }
-
-        let base = invidiousInstances[instanceIndex]
-        guard let url = URL(string: "\(base)/api/v1/videos/\(videoId)?local=true") else {
-            resolveViaInvidious(videoId: videoId, instanceIndex: instanceIndex + 1, completion: completion)
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 12_5_8 like Mac OS X)", forHTTPHeaderField: "User-Agent")
-
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self else { return }
-
-            if error != nil || data == nil {
-                self.resolveViaInvidious(videoId: videoId, instanceIndex: instanceIndex + 1, completion: completion)
-                return
-            }
-
-            guard let data = data,
-                  let json = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any],
-                  let adaptive = json["adaptiveFormats"] as? [[String: Any]] else {
-                self.resolveViaInvidious(videoId: videoId, instanceIndex: instanceIndex + 1, completion: completion)
-                return
-            }
-
-            let audioFormats = adaptive.filter { fmt in
-                guard let type = fmt["type"] as? String else { return false }
-                return type.hasPrefix("audio/")
-            }
-
-            // Prefer m4a / AAC (itag 140 or audio/mp4 container)
-            let preferred = audioFormats.first { fmt in
-                let container = (fmt["container"] as? String) ?? ""
-                let encoding = (fmt["encoding"] as? String) ?? ""
-                let itag = (fmt["itag"] as? Int) ?? 0
-                return container == "m4a" || encoding == "aac" || itag == 140
-            } ?? audioFormats.first
-
-            if let streamUrlStr = preferred?["url"] as? String,
-               let streamUrl = URL(string: streamUrlStr) {
-                completion(.success(streamUrl))
-            } else {
-                self.resolveViaInvidious(videoId: videoId, instanceIndex: instanceIndex + 1, completion: completion)
-            }
-        }
-        task.resume()
     }
 
-    // MARK: - Embedded Innertube Fallback
-
-    private func resolveViaEmbeddedInnertube(videoId: String, completion: @escaping (Result<URL, Error>) -> Void) {
-        guard let url = URL(string: "https://www.youtube.com/youtubei/v1/player?prettyPrint=false") else {
-            completion(.failure(NSError(domain: "StreamResolver", code: -2, userInfo: nil)))
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
-        request.setValue("https://www.youtube.com", forHTTPHeaderField: "Origin")
-        request.setValue("https://www.youtube.com/embed/\(videoId)", forHTTPHeaderField: "Referer")
-
-        let payload: [String: Any] = [
-            "context": [
-                "client": [
-                    "clientName": "WEB_EMBEDDED_PLAYER",
-                    "clientVersion": "2.20240501.00.00",
-                    "gl": "US",
-                    "hl": "en"
-                ],
-                "thirdParty": [
-                    "embedUrl": "https://www.youtube.com/embed/\(videoId)"
-                ]
-            ],
-            "videoId": videoId
-        ]
-
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: payload, options: []) else {
-            completion(.failure(NSError(domain: "StreamResolver", code: -3, userInfo: nil)))
-            return
-        }
-        request.httpBody = bodyData
-
-        let task = session.dataTask(with: request) { data, _, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            guard let data = data,
-                  let json = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any],
-                  let streamingData = json["streamingData"] as? [String: Any] else {
-                completion(.failure(NSError(domain: "StreamResolver", code: -4, userInfo: nil)))
-                return
-            }
-
-            if let hlsStr = streamingData["hlsManifestUrl"] as? String,
-               let hlsUrl = URL(string: hlsStr) {
-                completion(.success(hlsUrl))
-                return
-            }
-
-            if let adaptive = streamingData["adaptiveFormats"] as? [[String: Any]] {
-                let audioFormats = adaptive.filter { fmt in
-                    guard let mime = fmt["mimeType"] as? String else { return false }
-                    return mime.hasPrefix("audio/")
-                }
-                if let urlStr = audioFormats.first?["url"] as? String,
-                   let streamUrl = URL(string: urlStr) {
-                    completion(.success(streamUrl))
-                    return
-                }
-            }
-
-            completion(.failure(NSError(domain: "StreamResolver", code: -5, userInfo: [NSLocalizedDescriptionKey: "No audio stream available"])))
-        }
-        task.resume()
+    private func failure(_ message: String) -> NSError {
+        return NSError(domain: "iMusic.StreamResolver", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 }

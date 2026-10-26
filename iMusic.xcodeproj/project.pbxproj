@@ -32,18 +32,19 @@
 		B10000000000000000000033 /* ExploreViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000032 /* ExploreViewController.swift */; };
 		B10000000000000000000035 /* HomeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000034 /* HomeViewController.swift */; };
 		B10000000000000000000037 /* AccountViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000036 /* AccountViewController.swift */; };
-		B10000000000000000000039 /* DownloadedPlaylistsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000038 /* DownloadedPlaylistsViewController.swift */; };
-		B1000000000000000000003b /* DownloadedTracksViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000003a /* DownloadedTracksViewController.swift */; };
-		B1000000000000000000003d /* LibraryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000003c /* LibraryViewController.swift */; };
-		B1000000000000000000003f /* PlaylistDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000003e /* PlaylistDetailViewController.swift */; };
-		B10000000000000000000041 /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000040 /* SettingsViewController.swift */; };
-		B10000000000000000000043 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000042 /* MiniPlayerView.swift */; };
-		B10000000000000000000045 /* MainTabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000044 /* MainTabBarController.swift */; };
-		B10000000000000000000047 /* RootContainerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000046 /* RootContainerViewController.swift */; };
-		B10000000000000000000049 /* LyricsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000048 /* LyricsViewController.swift */; };
-		B1000000000000000000004b /* NowPlayingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000004a /* NowPlayingViewController.swift */; };
-		B1000000000000000000004d /* QueueViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000004c /* QueueViewController.swift */; };
-		B1000000000000000000004f /* SearchViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000004e /* SearchViewController.swift */; };
+		B10000000000000000000039 /* AlbumDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000038 /* AlbumDetailViewController.swift */; };
+		B1000000000000000000003b /* DownloadedPlaylistsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000003a /* DownloadedPlaylistsViewController.swift */; };
+		B1000000000000000000003d /* DownloadedTracksViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000003c /* DownloadedTracksViewController.swift */; };
+		B1000000000000000000003f /* LibraryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000003e /* LibraryViewController.swift */; };
+		B10000000000000000000041 /* PlaylistDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000040 /* PlaylistDetailViewController.swift */; };
+		B10000000000000000000043 /* SettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000042 /* SettingsViewController.swift */; };
+		B10000000000000000000045 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000044 /* MiniPlayerView.swift */; };
+		B10000000000000000000047 /* MainTabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000046 /* MainTabBarController.swift */; };
+		B10000000000000000000049 /* RootContainerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000048 /* RootContainerViewController.swift */; };
+		B1000000000000000000004b /* LyricsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000004a /* LyricsViewController.swift */; };
+		B1000000000000000000004d /* NowPlayingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000004c /* NowPlayingViewController.swift */; };
+		B1000000000000000000004f /* QueueViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000004e /* QueueViewController.swift */; };
+		B10000000000000000000051 /* SearchViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000050 /* SearchViewController.swift */; };
 		B20000000000000000000008 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000007 /* LaunchScreen.storyboard */; };
 		B40000000000000000000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000005 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -75,18 +76,19 @@
 		F10000000000000000000032 /* ExploreViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Explore/ExploreViewController.swift"; sourceTree = "<group>"; };
 		F10000000000000000000034 /* HomeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Home/HomeViewController.swift"; sourceTree = "<group>"; };
 		F10000000000000000000036 /* AccountViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/AccountViewController.swift"; sourceTree = "<group>"; };
-		F10000000000000000000038 /* DownloadedPlaylistsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/DownloadedPlaylistsViewController.swift"; sourceTree = "<group>"; };
-		F1000000000000000000003a /* DownloadedTracksViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/DownloadedTracksViewController.swift"; sourceTree = "<group>"; };
-		F1000000000000000000003c /* LibraryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/LibraryViewController.swift"; sourceTree = "<group>"; };
-		F1000000000000000000003e /* PlaylistDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/PlaylistDetailViewController.swift"; sourceTree = "<group>"; };
-		F10000000000000000000040 /* SettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/SettingsViewController.swift"; sourceTree = "<group>"; };
-		F10000000000000000000042 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/MiniPlayer/MiniPlayerView.swift"; sourceTree = "<group>"; };
-		F10000000000000000000044 /* MainTabBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Navigation/MainTabBarController.swift"; sourceTree = "<group>"; };
-		F10000000000000000000046 /* RootContainerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Navigation/RootContainerViewController.swift"; sourceTree = "<group>"; };
-		F10000000000000000000048 /* LyricsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/NowPlaying/LyricsViewController.swift"; sourceTree = "<group>"; };
-		F1000000000000000000004a /* NowPlayingViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/NowPlaying/NowPlayingViewController.swift"; sourceTree = "<group>"; };
-		F1000000000000000000004c /* QueueViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/NowPlaying/QueueViewController.swift"; sourceTree = "<group>"; };
-		F1000000000000000000004e /* SearchViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Search/SearchViewController.swift"; sourceTree = "<group>"; };
+		F10000000000000000000038 /* AlbumDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/AlbumDetailViewController.swift"; sourceTree = "<group>"; };
+		F1000000000000000000003a /* DownloadedPlaylistsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/DownloadedPlaylistsViewController.swift"; sourceTree = "<group>"; };
+		F1000000000000000000003c /* DownloadedTracksViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/DownloadedTracksViewController.swift"; sourceTree = "<group>"; };
+		F1000000000000000000003e /* LibraryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/LibraryViewController.swift"; sourceTree = "<group>"; };
+		F10000000000000000000040 /* PlaylistDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/PlaylistDetailViewController.swift"; sourceTree = "<group>"; };
+		F10000000000000000000042 /* SettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Library/SettingsViewController.swift"; sourceTree = "<group>"; };
+		F10000000000000000000044 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/MiniPlayer/MiniPlayerView.swift"; sourceTree = "<group>"; };
+		F10000000000000000000046 /* MainTabBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Navigation/MainTabBarController.swift"; sourceTree = "<group>"; };
+		F10000000000000000000048 /* RootContainerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Navigation/RootContainerViewController.swift"; sourceTree = "<group>"; };
+		F1000000000000000000004a /* LyricsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/NowPlaying/LyricsViewController.swift"; sourceTree = "<group>"; };
+		F1000000000000000000004c /* NowPlayingViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/NowPlaying/NowPlayingViewController.swift"; sourceTree = "<group>"; };
+		F1000000000000000000004e /* QueueViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/NowPlaying/QueueViewController.swift"; sourceTree = "<group>"; };
+		F10000000000000000000050 /* SearchViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Search/SearchViewController.swift"; sourceTree = "<group>"; };
 		F20000000000000000000007 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Base.lproj/LaunchScreen.storyboard"; sourceTree = "<group>"; };
 		F30000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		F40000000000000000000005 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
@@ -106,7 +108,7 @@
 		000000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
-				G10000000000000000000050 /* iMusic */,
+				G10000000000000000000052 /* iMusic */,
 				000000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -119,7 +121,7 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		G10000000000000000000050 /* iMusic */ = {
+		G10000000000000000000052 /* iMusic */ = {
 			isa = PBXGroup;
 			children = (
 				F10000000000000000000001 /* AppDelegate.swift */,
@@ -147,18 +149,19 @@
 				F10000000000000000000032 /* ExploreViewController.swift */,
 				F10000000000000000000034 /* HomeViewController.swift */,
 				F10000000000000000000036 /* AccountViewController.swift */,
-				F10000000000000000000038 /* DownloadedPlaylistsViewController.swift */,
-				F1000000000000000000003a /* DownloadedTracksViewController.swift */,
-				F1000000000000000000003c /* LibraryViewController.swift */,
-				F1000000000000000000003e /* PlaylistDetailViewController.swift */,
-				F10000000000000000000040 /* SettingsViewController.swift */,
-				F10000000000000000000042 /* MiniPlayerView.swift */,
-				F10000000000000000000044 /* MainTabBarController.swift */,
-				F10000000000000000000046 /* RootContainerViewController.swift */,
-				F10000000000000000000048 /* LyricsViewController.swift */,
-				F1000000000000000000004a /* NowPlayingViewController.swift */,
-				F1000000000000000000004c /* QueueViewController.swift */,
-				F1000000000000000000004e /* SearchViewController.swift */,
+				F10000000000000000000038 /* AlbumDetailViewController.swift */,
+				F1000000000000000000003a /* DownloadedPlaylistsViewController.swift */,
+				F1000000000000000000003c /* DownloadedTracksViewController.swift */,
+				F1000000000000000000003e /* LibraryViewController.swift */,
+				F10000000000000000000040 /* PlaylistDetailViewController.swift */,
+				F10000000000000000000042 /* SettingsViewController.swift */,
+				F10000000000000000000044 /* MiniPlayerView.swift */,
+				F10000000000000000000046 /* MainTabBarController.swift */,
+				F10000000000000000000048 /* RootContainerViewController.swift */,
+				F1000000000000000000004a /* LyricsViewController.swift */,
+				F1000000000000000000004c /* NowPlayingViewController.swift */,
+				F1000000000000000000004e /* QueueViewController.swift */,
+				F10000000000000000000050 /* SearchViewController.swift */,
 				F20000000000000000000007 /* LaunchScreen.storyboard */,
 				F30000000000000000000009 /* Info.plist */,
 				F40000000000000000000005 /* Assets.xcassets */,
@@ -260,18 +263,19 @@
 				B10000000000000000000033 /* ExploreViewController.swift in Sources */,
 				B10000000000000000000035 /* HomeViewController.swift in Sources */,
 				B10000000000000000000037 /* AccountViewController.swift in Sources */,
-				B10000000000000000000039 /* DownloadedPlaylistsViewController.swift in Sources */,
-				B1000000000000000000003b /* DownloadedTracksViewController.swift in Sources */,
-				B1000000000000000000003d /* LibraryViewController.swift in Sources */,
-				B1000000000000000000003f /* PlaylistDetailViewController.swift in Sources */,
-				B10000000000000000000041 /* SettingsViewController.swift in Sources */,
-				B10000000000000000000043 /* MiniPlayerView.swift in Sources */,
-				B10000000000000000000045 /* MainTabBarController.swift in Sources */,
-				B10000000000000000000047 /* RootContainerViewController.swift in Sources */,
-				B10000000000000000000049 /* LyricsViewController.swift in Sources */,
-				B1000000000000000000004b /* NowPlayingViewController.swift in Sources */,
-				B1000000000000000000004d /* QueueViewController.swift in Sources */,
-				B1000000000000000000004f /* SearchViewController.swift in Sources */,
+				B10000000000000000000039 /* AlbumDetailViewController.swift in Sources */,
+				B1000000000000000000003b /* DownloadedPlaylistsViewController.swift in Sources */,
+				B1000000000000000000003d /* DownloadedTracksViewController.swift in Sources */,
+				B1000000000000000000003f /* LibraryViewController.swift in Sources */,
+				B10000000000000000000041 /* PlaylistDetailViewController.swift in Sources */,
+				B10000000000000000000043 /* SettingsViewController.swift in Sources */,
+				B10000000000000000000045 /* MiniPlayerView.swift in Sources */,
+				B10000000000000000000047 /* MainTabBarController.swift in Sources */,
+				B10000000000000000000049 /* RootContainerViewController.swift in Sources */,
+				B1000000000000000000004b /* LyricsViewController.swift in Sources */,
+				B1000000000000000000004d /* NowPlayingViewController.swift in Sources */,
+				B1000000000000000000004f /* QueueViewController.swift in Sources */,
+				B10000000000000000000051 /* SearchViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -16,6 +16,12 @@ final class StorageManager {
 
     private init() {}
 
+    private func notify(name: Notification.Name, object: Any?) {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: name, object: nil)
+        }
+    }
+
     // MARK: - Favorites
 
     func getFavorites() -> [Track] {
@@ -55,7 +61,7 @@ final class StorageManager {
 
         if let data = try? JSONEncoder().encode(favorites) {
             defaults.set(data, forKey: favoritesKey)
-            NotificationCenter.default.post(name: StorageManager.favoritesDidChange, object: nil)
+            notify(name: StorageManager.favoritesDidChange, object: nil)
         }
         return isNowFavorite
     }
@@ -91,7 +97,7 @@ final class StorageManager {
 
         if let data = try? JSONEncoder().encode(history) {
             defaults.set(data, forKey: historyKey)
-            NotificationCenter.default.post(name: StorageManager.historyDidChange, object: nil)
+            notify(name: StorageManager.historyDidChange, object: nil)
         }
     }
 
@@ -120,7 +126,7 @@ final class StorageManager {
         list.insert(newPlaylist, at: 0)
         if let data = try? JSONEncoder().encode(list) {
             defaults.set(data, forKey: playlistsKey)
-            NotificationCenter.default.post(name: StorageManager.playlistsDidChange, object: nil)
+            notify(name: StorageManager.playlistsDidChange, object: nil)
         }
         return newPlaylist
     }
@@ -146,7 +152,7 @@ final class StorageManager {
                                      tracks: playlist.tracks)
                 if let data = try? JSONEncoder().encode(list) {
                     defaults.set(data, forKey: playlistsKey)
-                    NotificationCenter.default.post(name: StorageManager.playlistsDidChange, object: nil)
+                    notify(name: StorageManager.playlistsDidChange, object: nil)
                 }
             }
         }
@@ -173,7 +179,7 @@ final class StorageManager {
                                      tracks: playlist.tracks)
                 if let data = try? JSONEncoder().encode(list) {
                     defaults.set(data, forKey: playlistsKey)
-                    NotificationCenter.default.post(name: StorageManager.playlistsDidChange, object: nil)
+                    notify(name: StorageManager.playlistsDidChange, object: nil)
                 }
             }
         }
@@ -182,7 +188,7 @@ final class StorageManager {
     private func savePlaylists(_ list: [Playlist]) {
         if let data = try? JSONEncoder().encode(list) {
             defaults.set(data, forKey: playlistsKey)
-            NotificationCenter.default.post(name: StorageManager.playlistsDidChange, object: nil)
+            notify(name: StorageManager.playlistsDidChange, object: nil)
         }
     }
 }
