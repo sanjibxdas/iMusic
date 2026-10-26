@@ -13,8 +13,8 @@ final class ImageLoader {
         self.session = URLSession(configuration: config)
 
         // Strict memory caps for iPhone 6 (1 GB RAM total, ~300 MB Jetsam floor)
-        cache.totalCostLimit = 20 * 1024 * 1024 // 20 MB max
-        cache.countLimit = 60
+        cache.totalCostLimit = 16 * 1024 * 1024 // 16 MB decoded bitmap budget
+        cache.countLimit = 35
 
         NotificationCenter.default.addObserver(
             self,
@@ -46,8 +46,10 @@ final class ImageLoader {
                 return
             }
 
-            let cost = data.count
-            self.cache.setObject(image, forKey: key, cost: cost)
+            let pixelWidth = image.size.width * image.scale
+            let pixelHeight = image.size.height * image.scale
+            let bitmapBytes = Int(pixelWidth * pixelHeight * 4)
+            self.cache.setObject(image, forKey: key, cost: max(bitmapBytes, 1024))
 
             DispatchQueue.main.async {
                 completion(image)

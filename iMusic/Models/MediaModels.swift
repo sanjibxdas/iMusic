@@ -48,4 +48,18 @@ struct Playlist: Codable, Equatable {
         self.trackCount = trackCount
         self.tracks = tracks
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, author, thumbnailUrl, trackCount, tracks
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.title = (try? container.decode(String.self, forKey: .title)) ?? "Untitled Playlist"
+        self.author = try? container.decodeIfPresent(String.self, forKey: .author)
+        self.thumbnailUrl = try? container.decodeIfPresent(String.self, forKey: .thumbnailUrl)
+        self.tracks = (try? container.decode([Track].self, forKey: .tracks)) ?? []
+        self.trackCount = (try? container.decode(Int.self, forKey: .trackCount)) ?? tracks.count
+    }
 }

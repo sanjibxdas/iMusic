@@ -15,6 +15,7 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     static let statusDidChangeNotification = Notification.Name("DownloadManagerStatusDidChange")
     static let listDidChangeNotification = Notification.Name("DownloadManagerListDidChange")
 
+    private let lock = NSLock()
     private var downloadSession: URLSession!
     private var activeTasks: [String: URLSessionDownloadTask] = [:]
     private var taskTrackMap: [URLSessionDownloadTask: Track] = [:]
@@ -30,7 +31,6 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
         self.manifestURL = self.downloadsDirectory.appendingPathComponent("manifest.json")
         super.init()
 
-        // Ensure downloads directory exists
         if !FileManager.default.fileExists(atPath: downloadsDirectory.path) {
             try? FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true, attributes: nil)
         }
@@ -46,6 +46,8 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     // MARK: - Manifest Persistence
 
     private func loadManifest() {
+        lock.lock()
+        defer { lock.unlock() }
         guard let data = try? Data(contentsOf: manifestURL),
               let list = try? JSONDecoder().decode([Track].self, from: data) else {
             return
@@ -56,7 +58,11 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     }
 
     private func saveManifest() {
-        let list = Array(downloadedTracksMap.values)
+        let list: [Track]
+        lock.lock()
+        list = Array(downloadedTracksMap.values)
+        lock.unlock()
+
         if let data = try? JSONEncoder().encode(list) {
             try? data.write(to: manifestURL, options: .atomic)
         }
@@ -66,8 +72,11 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     // MARK: - Query Status
 
     func status(for trackId: String) -> DownloadStatus {
+        lock.lock()
+        defer { lock.unlock() }
+
         if downloadedTracksMap[trackId] != nil {
-            let file = localAudioURL(for: trackId)
+            let file = downloadsDirectory.appendingPathComponent("\(trackId).m4a")
             if FileManager.default.fileExists(atPath: file.path) {
                 return .downloaded
             }
@@ -83,6 +92,8 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     }
 
     func allDownloadedTracks() -> [Track] {
+        lock.lock()
+        defer { lock.unlock() }
         return Array(downloadedTracksMap.values).sorted { $0.title < $1.title }
     }
 
@@ -99,7 +110,9 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     func download(track: Track) {
         guard status(for: track.id) == .notDownloaded else { return }
 
+        lock.lock()
         progressMap[track.id] = 0.05
+        lock.unlock()
         notifyStatus(trackId: track.id)
 
         // Resolve stream URL first
@@ -109,21 +122,24 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
                 switch result {
                 case .success(let streamURL):
                     let task = self.downloadSession.downloadTask(with: streamURL)
+                    self.lock.lock()
                     self.activeTasks[track.id] = task
                     self.taskTrackMap[task] = track
+                    self.lock.unlock()
                     task.resume()
 
-                    // Also cache artwork locally
-                    if !track.artworkUrl.isEmpty {
-                        ImageLoader.shared.loadImage(from: track.artworkUrl) { [weak self] img in
-                            guard let self = self, let img = img,
-                                  let data = img.jpegData(compressionQuality: 0.85) else { return }
-                            let artURL = self.localArtworkURL(for: track.id)
-                            try? data.write(to: artURL, options: .atomic)
-                        }
+                    // Directly download raw artwork without uncompressed bitmap in RAM
+                    if let artUrl = URL(string: track.artworkUrl) {
+                        URLSession.shared.dataTask(with: artUrl) { [weak self] artData, _, _ in
+                            guard let self = self, let artData = artData else { return }
+                            let artFile = self.localArtworkURL(for: track.id)
+                            try? artData.write(to: artFile, options: .atomic)
+                        }.resume()
                     }
                 case .failure(let err):
+                    self.lock.lock()
                     self.progressMap.removeValue(forKey: track.id)
+                    self.lock.unlock()
                     self.notifyStatus(trackId: track.id, errorMsg: err.localizedDescription)
                 }
             }
@@ -139,18 +155,24 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     }
 
     func cancelDownload(trackId: String) {
+        lock.lock()
         if let task = activeTasks[trackId] {
             task.cancel()
             activeTasks.removeValue(forKey: trackId)
             taskTrackMap.removeValue(forKey: task)
         }
         progressMap.removeValue(forKey: trackId)
+        lock.unlock()
         notifyStatus(trackId: trackId)
     }
 
     func deleteDownload(trackId: String) {
         cancelDownload(trackId: trackId)
+
+        lock.lock()
         downloadedTracksMap.removeValue(forKey: trackId)
+        lock.unlock()
+
         let audioFile = localAudioURL(for: trackId)
         let artFile = localArtworkURL(for: trackId)
         try? FileManager.default.removeItem(at: audioFile)
@@ -170,19 +192,50 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
     // MARK: - URLSessionDownloadDelegate
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard let track = taskTrackMap[downloadTask] else { return }
-        let progress: Float
-        if totalBytesExpectedToWrite > 0 {
-            progress = Float(totalBytesWritten) / Float(totalBytesExpectedToWrite)
-        } else {
-            progress = 0.5
+        lock.lock()
+        guard let track = taskTrackMap[downloadTask] else {
+            lock.unlock()
+            return
         }
+        let progress: Float = (totalBytesExpectedToWrite > 0) ? Float(totalBytesWritten) / Float(totalBytesExpectedToWrite) : 0.5
         progressMap[track.id] = progress
+        lock.unlock()
         notifyStatus(trackId: track.id)
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        guard let track = taskTrackMap[downloadTask] else { return }
+        lock.lock()
+        guard let track = taskTrackMap[downloadTask] else {
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+
+        // Validate HTTP response code (ensure not an error HTML page)
+        if let httpResponse = downloadTask.response as? HTTPURLResponse,
+           httpResponse.statusCode < 200 || httpResponse.statusCode >= 300 {
+            try? FileManager.default.removeItem(at: location)
+            lock.lock()
+            progressMap.removeValue(forKey: track.id)
+            activeTasks.removeValue(forKey: track.id)
+            taskTrackMap.removeValue(forKey: downloadTask)
+            lock.unlock()
+            notifyStatus(trackId: track.id, errorMsg: "Server error \(httpResponse.statusCode)")
+            return
+        }
+
+        // Validate downloaded file size (> 32 KB minimum for valid audio)
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: location.path),
+           let size = attrs[.size] as? Int64, size < 32768 {
+            try? FileManager.default.removeItem(at: location)
+            lock.lock()
+            progressMap.removeValue(forKey: track.id)
+            activeTasks.removeValue(forKey: track.id)
+            taskTrackMap.removeValue(forKey: downloadTask)
+            lock.unlock()
+            notifyStatus(trackId: track.id, errorMsg: "Incomplete file downloaded")
+            return
+        }
 
         let destination = localAudioURL(for: track.id)
         try? FileManager.default.removeItem(at: destination)
@@ -191,30 +244,41 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
             try FileManager.default.moveItem(at: location, to: destination)
             var savedTrack = track
             savedTrack.streamUrl = destination.absoluteString
-            downloadedTracksMap[track.id] = savedTrack
-            saveManifest()
 
+            lock.lock()
+            downloadedTracksMap[track.id] = savedTrack
             progressMap.removeValue(forKey: track.id)
             activeTasks.removeValue(forKey: track.id)
             taskTrackMap.removeValue(forKey: downloadTask)
+            lock.unlock()
+
+            saveManifest()
             notifyStatus(trackId: track.id)
         } catch {
+            lock.lock()
             progressMap.removeValue(forKey: track.id)
             activeTasks.removeValue(forKey: track.id)
             taskTrackMap.removeValue(forKey: downloadTask)
+            lock.unlock()
             notifyStatus(trackId: track.id, errorMsg: error.localizedDescription)
         }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard let downloadTask = task as? URLSessionDownloadTask,
-              let track = taskTrackMap[downloadTask] else { return }
-
+        guard let downloadTask = task as? URLSessionDownloadTask else { return }
+        lock.lock()
+        guard let track = taskTrackMap[downloadTask] else {
+            lock.unlock()
+            return
+        }
         if let err = error {
             progressMap.removeValue(forKey: track.id)
             activeTasks.removeValue(forKey: track.id)
             taskTrackMap.removeValue(forKey: downloadTask)
+            lock.unlock()
             notifyStatus(trackId: track.id, errorMsg: err.localizedDescription)
+        } else {
+            lock.unlock()
         }
     }
 }
