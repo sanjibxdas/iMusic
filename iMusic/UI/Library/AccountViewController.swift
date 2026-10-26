@@ -220,6 +220,19 @@ final class YouTubeWebLoginViewController: UIViewController, WKNavigationDelegat
         }
     }
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Automatically check if login cookies were set on redirect
+        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
+            guard let self = self else { return }
+            let sapisid = cookies.first(where: { $0.name == "SAPISID" })?.value
+            if let sapisid = sapisid, !sapisid.isEmpty {
+                let cookieHeader = cookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+                YouTubeAccountManager.shared.saveAccount(name: "YouTube Music User", email: "Connected via Google Sign-In", cookie: cookieHeader, sapisid: sapisid)
+                self.dismiss(animated: true, completion: nil)
+            }
+        }
+    }
+
     @objc private func cancelAction() {
         dismiss(animated: true, completion: nil)
     }
