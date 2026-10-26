@@ -6,6 +6,7 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
 
     private enum Section: Int, CaseIterable {
         case downloads
+        case caching
         case playback
         case dataBackup
         case general
@@ -13,6 +14,7 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
         var title: String {
             switch self {
             case .downloads: return "DOWNLOADS"
+            case .caching: return "AUDIO CACHE"
             case .playback: return "AUDIO & PLAYBACK"
             case .dataBackup: return "BACKUP & RESTORE"
             case .general: return "GENERAL"
@@ -22,10 +24,15 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        NotificationCenter.default.addObserver(self, selector: #selector(cacheDidChange), name: AudioCache.didChangeNotification, object: nil)
         title = "Settings"
         view.backgroundColor = AppTheme.background
         setupNavigation()
         setupTableView()
+    }
+
+    @objc private func cacheDidChange() {
+        DispatchQueue.main.async { self.tableView.reloadData() }
     }
 
     private func setupNavigation() {
@@ -69,6 +76,7 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
         guard let sec = Section(rawValue: section) else { return 0 }
         switch sec {
         case .downloads: return 2
+        case .caching: return 4
         case .playback: return 4
         case .dataBackup: return 2
         case .general: return 2
@@ -111,6 +119,34 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
                 sw.addTarget(self, action: #selector(wifiSwitchChanged(_:)), for: .valueChanged)
                 cell.accessoryView = sw
                 cell.selectionStyle = .none
+            }
+
+        case .caching:
+            if indexPath.row == 0 {
+                cell.textLabel?.text = "Progressive Buffering"
+                let sw = UISwitch()
+                sw.isOn = settings.progressiveBuffering
+                sw.onTintColor = AppTheme.accent
+                sw.addTarget(self, action: #selector(progressiveSwitchChanged(_:)), for: .valueChanged)
+                cell.accessoryView = sw
+                cell.selectionStyle = .none
+            } else if indexPath.row == 1 {
+                cell.textLabel?.text = "Cache Played Songs"
+                let sw = UISwitch()
+                sw.isOn = settings.audioCacheEnabled
+                sw.onTintColor = AppTheme.accent
+                sw.addTarget(self, action: #selector(cacheEnabledSwitchChanged(_:)), for: .valueChanged)
+                cell.accessoryView = sw
+                cell.selectionStyle = .none
+            } else if indexPath.row == 2 {
+                cell.textLabel?.text = "Cache Size Limit"
+                let limit = settings.audioCacheLimitMB
+                cell.detailTextLabel?.text = limit == 0 ? "Unlimited" : "\(limit) MB"
+                cell.accessoryType = .disclosureIndicator
+            } else {
+                cell.textLabel?.text = "Clear Cache"
+                cell.textLabel?.textColor = .systemRed
+                cell.detailTextLabel?.text = Self.formatBytes(AudioCache.shared.cachedSizeInBytes())
             }
 
         case .playback:
@@ -176,6 +212,9 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
         switch sec {
         case .downloads:
             if indexPath.row == 0 { pickDownloadQuality() }
+        case .caching:
+            if indexPath.row == 2 { pickCacheLimit() }
+            if indexPath.row == 3 { confirmClearCache() }
         case .playback:
             if indexPath.row == 0 { pickOutputPrecision() }
             if indexPath.row == 1 { pickCrossfade() }
@@ -199,6 +238,52 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
 
     @objc private func swipeSwitchChanged(_ sender: UISwitch) {
         SettingsManager.shared.playNextOnSwipe = sender.isOn
+    }
+
+    @objc private func progressiveSwitchChanged(_ sender: UISwitch) {
+        SettingsManager.shared.progressiveBuffering = sender.isOn
+    }
+
+    @objc private func cacheEnabledSwitchChanged(_ sender: UISwitch) {
+        SettingsManager.shared.audioCacheEnabled = sender.isOn
+        tableView.reloadData()
+    }
+
+    private static func formatBytes(_ bytes: Int64) -> String {
+        if bytes <= 0 { return "Empty" }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+
+    private func pickCacheLimit() {
+        let options: [(String, Int)] = [
+            ("256 MB", 256),
+            ("512 MB", 512),
+            ("1 GB", 1024),
+            ("2 GB", 2048),
+            ("Unlimited", 0)
+        ]
+        let alert = UIAlertController(title: "Cache Size Limit", message: "Oldest cached songs are removed once the limit is reached.", preferredStyle: .actionSheet)
+        for option in options {
+            alert.addAction(UIAlertAction(title: option.0, style: .default, handler: { [weak self] _ in
+                SettingsManager.shared.audioCacheLimitMB = option.1
+                self?.tableView.reloadData()
+            }))
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+        present(alert, animated: true, completion: nil)
+    }
+
+    private func confirmClearCache() {
+        let size = Self.formatBytes(AudioCache.shared.cachedSizeInBytes())
+        let alert = UIAlertController(title: "Clear Audio Cache?", message: "Removes \(size) of cached songs. Downloaded songs in your library are not affected.", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Clear Cache", style: .destructive, handler: { [weak self] _ in
+            AudioCache.shared.clear()
+            self?.tableView.reloadData()
+        }))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+        present(alert, animated: true, completion: nil)
     }
 
     private func pickDownloadQuality() {
@@ -305,5 +390,9 @@ final class SettingsViewController: UIViewController, UITableViewDataSource, UIT
         let alert = UIAlertController(title: "Import Successful", message: "Your library and settings have been restored.", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
         present(alert, animated: true, completion: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }

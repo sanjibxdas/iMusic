@@ -44,7 +44,42 @@ final class StreamResolver {
             DispatchQueue.main.async { completion(.success(url)) }
             return
         }
-        resolve(track: track, itag: 140, completion: completion)
+        // A previously cached track replays from disk, so switching back is instant.
+        if SettingsManager.shared.audioCacheEnabled, let cached = AudioCache.shared.cachedURL(for: track.id) {
+            DispatchQueue.main.async { completion(.success(cached)) }
+            return
+        }
+        resolve(track: track, itag: 140) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .success(let remote):
+                guard SettingsManager.shared.audioCacheEnabled else {
+                    DispatchQueue.main.async { completion(.success(remote)) }
+                    return
+                }
+                if SettingsManager.shared.progressiveBuffering {
+                    // Hand the remote URL over immediately and cache in the background.
+                    DispatchQueue.main.async { completion(.success(remote)) }
+                    AudioCache.shared.cache(trackId: track.id, remoteURL: remote) { _ in
+                        self.trimCacheIfNeeded()
+                    }
+                } else {
+                    // Wait for the whole file so playback never touches the network.
+                    AudioCache.shared.cache(trackId: track.id, remoteURL: remote) { cached in
+                        self.trimCacheIfNeeded()
+                        DispatchQueue.main.async { completion(cached) }
+                    }
+                }
+            case .failure(let error):
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }
+    }
+
+    private func trimCacheIfNeeded() {
+        let limitMB = SettingsManager.shared.audioCacheLimitMB
+        guard limitMB > 0 else { return }
+        AudioCache.shared.trim(keepingBytes: Int64(limitMB) * 1024 * 1024)
     }
 
     func resolveDownloadURL(for track: Track, completion: @escaping (Result<URL, Error>) -> Void) {
@@ -52,10 +87,12 @@ final class StreamResolver {
     }
 
     /// Resolves the next track during the current one, so its round trip is not felt at switch time.
+    /// Also fills the audio cache for it when caching is on, making the switch instant.
     func prefetch(_ track: Track?) {
         guard let track = track, !track.id.hasPrefix("itunes_") else { return }
         let local = DownloadManager.shared.localAudioURL(for: track.id)
         if FileManager.default.fileExists(atPath: local.path) { return }
+        if SettingsManager.shared.audioCacheEnabled, AudioCache.shared.isCached(trackId: track.id) { return }
         resolveStreamURL(for: track) { _ in }
     }
 

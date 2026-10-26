@@ -33,6 +33,10 @@ final class SettingsManager {
     private let keySmartAlignment = "iMusic_smartAlignment"
     private let keyHideShorts = "iMusic_hideShorts"
     private let keySoftwareVolume = "iMusic_softwareVolume"
+    private let keyProgressiveBuffering = "iMusic_progressiveBuffering"
+    private let keyStreamOnCellular = "iMusic_streamOnCellular"
+    private let keyAudioCacheEnabled = "iMusic_audioCacheEnabled"
+    private let keyAudioCacheLimitMB = "iMusic_audioCacheLimitMB"
 
     private init() {}
 
@@ -134,6 +138,55 @@ final class SettingsManager {
         }
         set {
             defaults.set(newValue, forKey: keySoftwareVolume)
+            notifyChange()
+        }
+    }
+
+    /// When on, playback starts from a partially cached file and the rest keeps loading
+    /// in the background. When off, a track is fully cached before it starts.
+    var progressiveBuffering: Bool {
+        get {
+            if defaults.object(forKey: keyProgressiveBuffering) == nil { return true }
+            return defaults.bool(forKey: keyProgressiveBuffering)
+        }
+        set {
+            defaults.set(newValue, forKey: keyProgressiveBuffering)
+            notifyChange()
+        }
+    }
+
+    /// Streaming over cellular. Off by default to match the Wi-Fi-only download policy,
+    /// but it must not silently block caching of a track the user explicitly played.
+    var streamOnCellular: Bool {
+        get {
+            if defaults.object(forKey: keyStreamOnCellular) == nil { return true }
+            return defaults.bool(forKey: keyStreamOnCellular)
+        }
+        set {
+            defaults.set(newValue, forKey: keyStreamOnCellular)
+            notifyChange()
+        }
+    }
+
+    var audioCacheEnabled: Bool {
+        get {
+            if defaults.object(forKey: keyAudioCacheEnabled) == nil { return true }
+            return defaults.bool(forKey: keyAudioCacheEnabled)
+        }
+        set {
+            defaults.set(newValue, forKey: keyAudioCacheEnabled)
+            notifyChange()
+        }
+    }
+
+    /// Cache budget in megabytes; 0 means unlimited.
+    var audioCacheLimitMB: Int {
+        get {
+            if defaults.object(forKey: keyAudioCacheLimitMB) == nil { return 512 }
+            return defaults.integer(forKey: keyAudioCacheLimitMB)
+        }
+        set {
+            defaults.set(newValue, forKey: keyAudioCacheLimitMB)
             notifyChange()
         }
     }

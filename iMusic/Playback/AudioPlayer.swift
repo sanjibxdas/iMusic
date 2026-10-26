@@ -293,7 +293,7 @@ final class AudioPlayer: NSObject {
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: nil)
         let item = AVPlayerItem(url: url)
-        item.preferredForwardBufferDuration = 2
+        item.preferredForwardBufferDuration = SettingsManager.shared.progressiveBuffering ? 2 : 0
         player.replaceCurrentItem(with: item)
         NotificationCenter.default.addObserver(self, selector: #selector(playerItemDidReachEnd(_:)), name: .AVPlayerItemDidPlayToEndTime, object: item)
         NotificationCenter.default.addObserver(self, selector: #selector(playerItemDidFail(_:)), name: .AVPlayerItemFailedToPlayToEndTime, object: item)
