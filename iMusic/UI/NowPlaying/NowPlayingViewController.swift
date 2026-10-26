@@ -215,12 +215,17 @@ final class NowPlayingViewController: UIViewController {
             centerContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             centerContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             centerContainer.heightAnchor.constraint(equalToConstant: 250),
+            centerContainer.heightAnchor.constraint(lessThanOrEqualTo: contentView.heightAnchor, multiplier: 0.42),
 
             // Artwork
             shadowView.centerXAnchor.constraint(equalTo: centerContainer.centerXAnchor),
             shadowView.centerYAnchor.constraint(equalTo: centerContainer.centerYAnchor),
+            shadowView.topAnchor.constraint(greaterThanOrEqualTo: centerContainer.topAnchor),
+            shadowView.bottomAnchor.constraint(lessThanOrEqualTo: centerContainer.bottomAnchor),
             shadowView.widthAnchor.constraint(equalToConstant: 210),
             shadowView.heightAnchor.constraint(equalToConstant: 210),
+            shadowView.widthAnchor.constraint(lessThanOrEqualTo: centerContainer.widthAnchor, multiplier: 0.82),
+            shadowView.heightAnchor.constraint(equalTo: shadowView.widthAnchor),
 
             artworkView.topAnchor.constraint(equalTo: shadowView.topAnchor),
             artworkView.bottomAnchor.constraint(equalTo: shadowView.bottomAnchor),

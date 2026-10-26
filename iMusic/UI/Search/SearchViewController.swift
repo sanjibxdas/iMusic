@@ -43,6 +43,11 @@ final class SearchViewController: UIViewController, UITableViewDataSource, UITab
         return searchController.searchBar.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
+    private func row(at index: Int) -> SearchRow? {
+        guard index >= 0 && index < rows.count else { return nil }
+        return rows[index]
+    }
+
     private func setupNavigation() {
         navigationController?.navigationBar.prefersLargeTitles = true
         navigationController?.navigationBar.barTintColor = AppTheme.background
@@ -224,7 +229,8 @@ final class SearchViewController: UIViewController, UITableViewDataSource, UITab
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        switch rows[indexPath.row] {
+        guard let row = row(at: indexPath.row) else { return UITableViewCell() }
+        switch row {
         case .track(let track):
             guard let cell = tableView.dequeueReusableCell(withIdentifier: TrackCell.reuseIdentifier, for: indexPath) as? TrackCell else { return UITableViewCell() }
             cell.configure(with: track, isCurrentlyPlaying: AudioPlayer.shared.currentTrack?.id == track.id)
@@ -274,7 +280,8 @@ final class SearchViewController: UIViewController, UITableViewDataSource, UITab
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        switch rows[indexPath.row] {
+        guard let row = row(at: indexPath.row) else { return }
+        switch row {
         case .track(let track):
             guard let index = tracks.firstIndex(where: { $0.id == track.id }) else { return }
             AudioPlayer.shared.play(tracks, startingAt: index)

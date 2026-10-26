@@ -253,7 +253,7 @@ final class DownloadManager: NSObject, URLSessionDownloadDelegate {
             throw invalid("The audio download is incomplete. Please retry.")
         }
         if response.statusCode == 206 {
-            guard let range = response.value(forHTTPHeaderField: "Content-Range"),
+            guard let range = response.allHeaderFields["Content-Range"] as? String,
                   range.hasPrefix("bytes 0-"), let totalString = range.split(separator: "/").last,
                   let total = Int64(totalString), total == size else {
                 throw invalid("The server returned only part of the song. Please retry.")

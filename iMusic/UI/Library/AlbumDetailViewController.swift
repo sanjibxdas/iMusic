@@ -10,6 +10,7 @@ final class AlbumDetailViewController: UIViewController, UITableViewDataSource, 
     private let playButton = UIButton(type: .custom)
     private let indicator = UIActivityIndicatorView(style: .white)
     private var playlist: Playlist?
+    private var lastError: String?
 
     init(album: Album) {
         self.album = album
@@ -124,6 +125,7 @@ final class AlbumDetailViewController: UIViewController, UITableViewDataSource, 
             switch result {
             case .success(let loaded):
                 self.playlist = loaded
+                self.lastError = nil
                 self.playButton.isHidden = loaded.tracks.isEmpty
             case .failure(let error):
                 self.playlist = nil
@@ -151,13 +153,9 @@ final class AlbumDetailViewController: UIViewController, UITableViewDataSource, 
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        guard let playlist = playlist else {
-            return (indicator.isAnimating || lastError == nil) ? 0 : 1
-        }
+        guard let playlist = playlist else { return lastError == nil ? 0 : 1 }
         return playlist.tracks.count
     }
-
-    private var lastError: String?
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         guard let playlist = playlist else {

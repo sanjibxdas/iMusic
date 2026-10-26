@@ -290,6 +290,8 @@ final class AudioPlayer: NSObject {
     }
 
     private func installItem(url: URL, token: UUID) {
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemFailedToPlayToEndTime, object: nil)
         let item = AVPlayerItem(url: url)
         item.preferredForwardBufferDuration = 2
         player.replaceCurrentItem(with: item)
