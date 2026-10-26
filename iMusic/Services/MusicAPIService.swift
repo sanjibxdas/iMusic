@@ -137,7 +137,7 @@ final class MusicAPIService {
                 if let id = videoID, id.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil, !title.isEmpty, seenTracks.insert(id).inserted {
                     var duration: Double = 0
                     let fixed = item["fixedColumns"] as? [[String: Any]] ?? []
-                    let timeText = fixed.compactMap { ($0["musicResponsiveListItemFixedColumnRenderer"] as? [String: Any])?["text"] }.map(text).first ?? parts.last ?? ""
+                    let timeText: String = fixed.compactMap { ($0["musicResponsiveListItemFixedColumnRenderer"] as? [String: Any])?["text"] }.map(text).first ?? parts.last ?? ""
                     let timeParts = timeText.components(separatedBy: ":").compactMap { Double($0) }
                     if timeParts.count >= 2 && timeParts.count <= 3 { duration = timeParts.reduce(0) { $0 * 60 + $1 } }
                     result.tracks.append(Track(id: id, title: title, artist: artist, duration: duration, artworkUrl: thumbnail))

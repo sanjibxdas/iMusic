@@ -241,7 +241,7 @@ final class AudioPlayer: NSObject {
     /// Resolves the stream for an upcoming queue entry so playback can start immediately.
     func prewarm(at index: Int) {
         guard entries.indices.contains(index) else { return }
-        StreamResolver.shared.resolveStreamURL(for: entries[index].track) { _ in }
+        StreamResolver.shared.prefetch(entries[index].track)
     }
 
     private func resetPlayback() {

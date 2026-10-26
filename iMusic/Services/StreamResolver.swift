@@ -9,9 +9,11 @@ final class StreamResolver {
     }
 
     private let state = DispatchQueue(label: "iMusic.resolver")
+    private let probeQueue = DispatchQueue(label: "iMusic.resolver.probe", qos: .userInitiated)
     private var cache: [String: CachedStream] = [:]
     private var pending: [String: [(Result<URL, Error>) -> Void]] = [:]
     private let session: URLSession
+    private let probeSession: URLSession
     private let base = URL(string: "https://yt.chocolatemoo53.com")!
 
     private init() {
@@ -20,6 +22,11 @@ final class StreamResolver {
         configuration.timeoutIntervalForResource = 8
         configuration.httpMaximumConnectionsPerHost = 3
         session = URLSession(configuration: configuration)
+
+        let probeConfiguration = URLSessionConfiguration.ephemeral
+        probeConfiguration.timeoutIntervalForRequest = 6
+        probeConfiguration.timeoutIntervalForResource = 10
+        probeSession = URLSession(configuration: probeConfiguration)
     }
 
     func invalidate(trackId: String) {
@@ -42,6 +49,14 @@ final class StreamResolver {
 
     func resolveDownloadURL(for track: Track, completion: @escaping (Result<URL, Error>) -> Void) {
         resolve(track: track, itag: SettingsManager.shared.downloadQuality.itag, completion: completion)
+    }
+
+    /// Resolves the next track during the current one, so its round trip is not felt at switch time.
+    func prefetch(_ track: Track?) {
+        guard let track = track, !track.id.hasPrefix("itunes_") else { return }
+        let local = DownloadManager.shared.localAudioURL(for: track.id)
+        if FileManager.default.fileExists(atPath: local.path) { return }
+        resolveStreamURL(for: track) { _ in }
     }
 
     func resolveDirectYouTubeId(_ videoId: String, completion: @escaping (Result<URL, Error>) -> Void) {
@@ -88,12 +103,22 @@ final class StreamResolver {
                         return mime.hasPrefix("audio/mp4") && (format["url"] as? String) != nil
                     }
                     let selected = aac.first { String(describing: $0["itag"] ?? "") == String(itag) } ?? aac.first
-                    if let value = selected?["url"] as? String, let url = URL(string: value),
-                       url.scheme == "https", url.host == self.base.host {
-                        result = .success(url)
-                    } else {
-                        result = .failure(self.failure("The streaming service did not provide a compatible proxied AAC stream."))
+                    guard let value = selected?["url"] as? String, let url = URL(string: value),
+                          url.scheme == "https", url.host == self.base.host else {
+                        print("Stream metadata: \(Int(Date().timeIntervalSince(started) * 1000)) ms")
+                        self.finish(key: key, result: .failure(self.failure("The streaming service did not provide a compatible proxied AAC stream.")))
+                        return
                     }
+                    // Confirm the proxy really serves audio before handing the URL to AVPlayer;
+                    // an expired token otherwise only fails after playback has been requested.
+                    self.probe(url) { ok in
+                        print("Stream metadata: \(Int(Date().timeIntervalSince(started) * 1000)) ms, probe: \(ok ? "ok" : "failed")")
+                        let result: Result<URL, Error> = ok
+                            ? .success(url)
+                            : .failure(self.failure("The audio link could not be reached. Please retry."))
+                        self.finish(key: key, result: result)
+                    }
+                    return
                 } else {
                     result = .failure(self.failure("The streaming service is unavailable. Please retry."))
                 }
@@ -115,6 +140,19 @@ final class StreamResolver {
             let callbacks = self.pending.removeValue(forKey: key) ?? []
             DispatchQueue.main.async { callbacks.forEach { $0(result) } }
         }
+    }
+
+    /// Range-requests the first audio bytes so a dead or expired link is caught before playback.
+    private func probe(_ url: URL, completion: @escaping (Bool) -> Void) {
+        var request = URLRequest(url: url)
+        request.setValue("bytes=0-2047", forHTTPHeaderField: "Range")
+        probeSession.dataTask(with: request) { data, response, error in
+            let http = response as? HTTPURLResponse
+            let statusOK = http.map { $0.statusCode == 200 || $0.statusCode == 206 } ?? false
+            let mime = (http?.allHeaderFields["Content-Type"] as? String)?.lowercased() ?? ""
+            let isAudio = mime.hasPrefix("audio/") || mime.contains("mp4")
+            completion(error == nil && statusOK && isAudio && (data?.count ?? 0) > 0)
+        }.resume()
     }
 
     private func failure(_ message: String) -> NSError {
