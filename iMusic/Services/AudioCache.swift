@@ -8,7 +8,7 @@ final class AudioCache {
     static let didChangeNotification = Notification.Name("AudioCacheDidChange")
 
     private struct Completion {
-        let handlers: [(Result<URL, Error>) -> Void]
+        var handlers: [(Result<URL, Error>) -> Void]
     }
 
     private let state = DispatchQueue(label: "iMusic.audiocache")
