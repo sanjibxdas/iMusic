@@ -60,6 +60,8 @@ final class ExploreViewController: UIViewController, UITableViewDataSource, UITa
         tableView.backgroundColor = AppTheme.background
         tableView.separatorColor = AppTheme.separator
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 0)
+        tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 106, right: 0)
+        tableView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: 106, right: 0)
         tableView.dataSource = self
         tableView.delegate = self
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -138,6 +140,8 @@ final class CategoryDetailViewController: UIViewController, UITableViewDataSourc
         tableView.backgroundColor = AppTheme.background
         tableView.separatorColor = AppTheme.separator
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 68, bottom: 0, right: 0)
+        tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 106, right: 0)
+        tableView.scrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: 106, right: 0)
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(TrackCell.self, forCellReuseIdentifier: TrackCell.reuseIdentifier)
